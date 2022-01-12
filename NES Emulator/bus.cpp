@@ -1,8 +1,10 @@
 #include "bus.h"
+#include "cpu.h"
 
 bus::bus() {
 
 	for (auto& i : ram) i = 0x0000;
+	cpu.connectBus(this);
 
 }
 void bus::write(uint16_t address, uint8_t data) {

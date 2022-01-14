@@ -18,14 +18,14 @@ public:
 
 
 	enum statusflagslist {
-		C = 0,
-		Z = 1,
-		ID = 2,
-		D = 3,
-		B = 4,
-		U = 5,
-		O = 6,
-		N = 7
+		C = (1 << 0),
+		Z = (1 << 1),
+		ID = (1 << 2),
+		D = (1 << 3),
+		B = (1 << 4),
+		U = (1 << 5),
+		O = (1 << 6),
+		N = (1 << 7)
 	};
 
 	uint8_t accumulator = 0x00;

@@ -187,3 +187,138 @@ uint8_t cpu::REL()
 		addr_rel |= 0xFF00;
 	return 0;
 }
+
+// instructions
+
+uint8_t cpu::fetch() {
+	if (lookup[opcode].addressingmode != &cpu::IMP) {
+		fetched = read(addr_abs);
+		return fetched;
+	}
+}
+
+uint8_t cpu::AND() {
+	fetch();
+	accumulator = accumulator & fetched;
+	SetFlag(Z, accumulator == 0x00);
+	SetFlag(N, accumulator & 0x80);
+	return 1;
+}
+
+uint8_t cpu::BCS() {
+	if (GetFlag(C) == 1) {
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles += 2;
+		}
+		else {
+			cycles++;
+		}
+
+		pc = addr_abs;
+	}
+}
+uint8_t cpu::CLC() {
+	SetFlag(C, false);
+	return 0;
+}
+
+uint8_t cpu::ADC() {
+	fetch();
+	uint16_t temp = (uint16_t)accumulator + (uint16_t)fetched + (uint16_t)GetFlag(C);
+	SetFlag(C, temp > 255);
+	SetFlag(Z, (temp & 0x00FF) == 0);
+	SetFlag(N, temp & 0x80);
+	SetFlag(O, (~((uint16_t)accumulator ^ (uint16_t)fetched) & ((uint16_t)accumulator ^ (uint16_t)temp)) & 0x0080);
+	accumulator = temp & 0x00FF;
+	return 1;
+}
+
+uint8_t cpu::SBC() {
+	fetch();
+	uint16_t value = ((uint16_t)fetched ^ 0x00FF);
+	uint16_t temp = (uint16_t)accumulator + value + (uint16_t)GetFlag(C);
+	SetFlag(C, temp & 0xFF00);
+	SetFlag(Z, (temp & 0x00FF) == 0);
+	SetFlag(N, temp & 0x0080);
+	SetFlag(O, (temp ^ (uint16_t)accumulator) & (temp ^ value) & 0x0080);
+	accumulator = temp & 0x00FF;
+	return 1;
+
+}
+
+void cpu::reset() {
+	accumulator = 0;
+	xindex = 0;
+	yindex = 0;
+	sp = 0;
+	sr = 0x00 | U;
+
+	addr_abs = 0xFFFC;
+	uint16_t lo = read(addr_abs + 0);
+	uint16_t hi = read(addr_abs + 1);
+
+	pc = (hi << 8) | lo;
+	addr_rel = 0x0000;
+	addr_abs = 0x0000;
+	fetched = 0x00;
+
+	cycles = 8; 
+}
+
+void cpu::interrupt() {
+	if (GetFlag(ID) == 0) {
+
+		write(0x0100 + sp, (pc >> 8) & 0x00FF);
+		sp--;
+		write(0x0100 + sp, pc & 0x00FF);
+		sp--;
+
+		SetFlag(B, 0);
+		SetFlag(U, 1);
+		SetFlag(ID, 1);
+		write(0x0100 + sp, sr);
+		sp--;
+		addr_abs = 0xFFFE;
+		uint16_t lo = read(addr_abs + 0);
+		uint16_t hi = read(addr_abs + 1);
+		pc = (hi << 8) | lo;
+
+		cycles = 7;
+
+	}
+}
+void cpu::nminterrupt() {
+
+		write(0x0100 + sp, (pc >> 8) & 0x00FF);
+		sp--;
+		write(0x0100 + sp, pc & 0x00FF);
+		sp--;
+
+		SetFlag(B, 0);
+		SetFlag(U, 1);
+		SetFlag(ID, 1);
+		write(0x0100 + sp, sr);
+		sp--;
+		addr_abs = 0xFFFA;
+		uint16_t lo = read(addr_abs + 0);
+		uint16_t hi = read(addr_abs + 1);
+		pc = (hi << 8) | lo;
+
+		cycles = 8;
+
+
+}
+
+uint8_t cpu::RTI() {
+	sp++;
+	sr = read(0x0100 + sp);
+	sr &= ~B;
+	sr &= ~U;
+	sp++;
+	pc = (uint16_t)read(0x0100 + sp);
+	sp++;
+	pc |= (uint16_t)read(0x0100 + sp) << 8;
+	return 0;
+}
+

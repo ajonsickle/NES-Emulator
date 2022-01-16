@@ -205,19 +205,6 @@ uint8_t cpu::AND() {
 	return 1;
 }
 
-uint8_t cpu::BCS() {
-	if (GetFlag(C) == 1) {
-		addr_abs = pc + addr_rel;
-		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
-			cycles += 2;
-		}
-		else {
-			cycles++;
-		}
-
-		pc = addr_abs;
-	}
-}
 uint8_t cpu::CLC() {
 	SetFlag(C, false);
 	return 0;
@@ -321,4 +308,288 @@ uint8_t cpu::RTI() {
 	pc |= (uint16_t)read(0x0100 + sp) << 8;
 	return 0;
 }
+
+uint8_t cpu::ASL() {
+	fetch();
+	auto temp = (uint16_t)fetched << 1;
+	SetFlag(C, (temp & 0xFF00) > 0);
+	SetFlag(N, (temp & 0x800));
+	SetFlag(Z, (temp & 0x00FF) == 0x00);
+	if (lookup[opcode].addressingmode == &cpu::IMP) {
+		accumulator = temp & 0x00FF;
+	}
+	else {
+		write(addr_abs, temp & 0x00FF);
+	}
+	return 0;
+}
+
+uint8_t cpu::BCC() {
+	if (GetFlag(C) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::BCS() {
+	if (GetFlag(C) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::BEQ() {
+		if (GetFlag(Z) == 1) {
+			cycles++;
+			addr_abs = pc + addr_rel;
+			if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+				cycles++;
+			}
+			pc = addr_abs;
+		}
+		return 0;
+}
+
+uint8_t cpu::BIT() {
+	fetch();
+	auto temp = accumulator & fetched;
+	SetFlag(Z, (temp & 0x00FF) == 0x00);
+	SetFlag(N, fetched & (1 << 7));
+	SetFlag(O, fetched & (1 << 6));
+	return 0;
+}
+
+uint8_t cpu::BMI() {
+	if (GetFlag(N) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::BNE() {
+	if (GetFlag(Z) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::BPL() {
+	if (GetFlag(N) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::BRK() {
+	pc++;
+
+	SetFlag(ID, 1);
+	write(0x0100 + sp, (pc >> 8) & 0x00FF);
+	sp--;
+	write(0x0100 + sp, pc & 0x00FF);
+	sp--;
+
+	SetFlag(B, 1);
+	write(0x0100 + sp, sr);
+	sp--;
+	SetFlag(B, 0);
+
+	pc = (uint16_t)read(0xFFFE) | ((uint16_t)read(0xFFFF) << 8);
+	return 0;
+}
+
+uint8_t cpu::BVC() {
+	if (GetFlag(O) == 0) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::BVS() {
+	if (GetFlag(O) == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+uint8_t cpu::CLD() {
+	SetFlag(D, false);
+	return 0;
+}
+
+uint8_t cpu::CLI() {
+	SetFlag(ID, false);
+	return 0;
+}
+
+uint8_t cpu::CLV() {
+	SetFlag(O, false);
+	return 0;
+}
+
+uint8_t cpu::CMP() {
+	fetch();
+	auto temp = (uint16_t)accumulator - (uint16_t)fetched;
+	SetFlag(C, (accumulator >= fetched));
+	SetFlag(N, (temp & 0x0080));
+	SetFlag(Z, (temp & 0x00FF) == 0x0080);
+	return 1;
+}
+
+uint8_t cpu::CPX() {
+	fetch();
+	auto temp = (uint16_t)xindex - (uint16_t)fetched;
+	SetFlag(C, (xindex >= fetched));
+	SetFlag(N, (temp & 0x0080));
+	SetFlag(Z, (temp & 0x00FF) == 0x0080);
+	return 1;
+}
+
+uint8_t cpu::CPY() {
+	fetch();
+	auto temp = (uint16_t)yindex - (uint16_t)fetched;
+	SetFlag(C, (yindex >= fetched));
+	SetFlag(N, (temp & 0x0080));
+	SetFlag(Z, (temp & 0x00FF) == 0x0080);
+	return 1;
+}
+
+uint8_t cpu::DEC() {
+	fetch();
+	write(addr_abs, fetched - 1);
+	SetFlag(N, (fetched - 1) & 0x80);
+	SetFlag(Z, (fetched - 1) == 0x00);
+	return 0;
+}
+
+uint8_t cpu::DEX() {
+	xindex -= 1;
+	SetFlag(N, xindex & 0x80);
+	SetFlag(Z, xindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::DEY() {
+	yindex -= 1;
+	SetFlag(N, yindex & 0x80);
+	SetFlag(Z, yindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::EOR() {
+	fetch();
+	auto temp = (fetched | accumulator) & (~(fetched & accumulator));
+	SetFlag(N, temp & 0x80);
+	SetFlag(Z, temp == 0x00);
+	return 1;
+}
+
+uint8_t cpu::INC() {
+	fetch();
+	write(addr_abs, fetched + 1);
+	SetFlag(N, (fetched + 1) & 0x80);
+	SetFlag(Z, (fetched + 1) == 0x00);
+	return 0;
+}
+
+uint8_t cpu::INX() {
+	xindex++;
+	SetFlag(N, xindex & 0x80);
+	SetFlag(Z, xindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::INY() {
+	yindex++;
+	SetFlag(N, yindex & 0x80);
+	SetFlag(Z, yindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::JMP() {
+	pc = addr_abs;
+	return 0;
+}
+
+uint8_t cpu::JSR() {
+
+	pc--;
+
+	write(0x0100 + sp, (pc >> 8) & 0x00FF);
+	sp--;
+	write(0x0100 + sp, pc & 0x00FF);
+	sp--;
+
+	pc = addr_abs;
+}
+
+uint8_t cpu::LDA() {
+
+	fetch();
+	accumulator = fetched;
+	SetFlag(N, fetched & 0x80);
+	SetFlag(Z, fetched == 0x00);
+	return 1;
+
+}
+
+uint8_t cpu::LDX() {
+
+	fetch();
+	xindex = fetched;
+	SetFlag(N, fetched & 0x80);
+	SetFlag(Z, fetched == 0x00);
+	return 1;
+
+}
+
+uint8_t cpu::LDY() {
+
+	fetch();
+	yindex = fetched;
+	SetFlag(N, fetched & 0x80);
+	SetFlag(Z, fetched == 0x00);
+	return 1;
+
+}
+
+
+
+
+
 

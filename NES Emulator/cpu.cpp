@@ -256,16 +256,13 @@ void cpu::reset() {
 void cpu::interrupt() {
 	if (GetFlag(ID) == 0) {
 
-		write(0x0100 + sp, (pc >> 8) & 0x00FF);
-		sp--;
-		write(0x0100 + sp, pc & 0x00FF);
-		sp--;
+		pushtostack((pc >> 8) & 0x00FF);
+		pushtostack(pc & 0x00FF);
 
 		SetFlag(B, 0);
 		SetFlag(U, 1);
 		SetFlag(ID, 1);
-		write(0x0100 + sp, sr);
-		sp--;
+		pushtostack(sr);
 		addr_abs = 0xFFFE;
 		uint16_t lo = read(addr_abs + 0);
 		uint16_t hi = read(addr_abs + 1);
@@ -277,16 +274,13 @@ void cpu::interrupt() {
 }
 void cpu::nminterrupt() {
 
-		write(0x0100 + sp, (pc >> 8) & 0x00FF);
-		sp--;
-		write(0x0100 + sp, pc & 0x00FF);
-		sp--;
+		pushtostack((pc >> 8) & 0x00FF);
+		pushtostack(pc & 0x00FF);
 
 		SetFlag(B, 0);
 		SetFlag(U, 1);
 		SetFlag(ID, 1);
-		write(0x0100 + sp, sr);
-		sp--;
+		pushtostack(sr);
 		addr_abs = 0xFFFA;
 		uint16_t lo = read(addr_abs + 0);
 		uint16_t hi = read(addr_abs + 1);
@@ -295,6 +289,18 @@ void cpu::nminterrupt() {
 		cycles = 8;
 
 
+}
+
+void cpu::pushtostack(uint8_t data) {
+	write(0x0100 + sp, data);
+	sp--;
+}
+
+uint8_t cpu::popfromstack() {
+	sp++;
+	auto data = read(0x0100 + sp); 
+	write(0x0100 + sp, 0x00);
+	return data;
 }
 
 uint8_t cpu::RTI() {
@@ -409,14 +415,11 @@ uint8_t cpu::BRK() {
 	pc++;
 
 	SetFlag(ID, 1);
-	write(0x0100 + sp, (pc >> 8) & 0x00FF);
-	sp--;
-	write(0x0100 + sp, pc & 0x00FF);
-	sp--;
+	pushtostack((pc >> 8) & 0x00FF);
+	pushtostack(pc & 0x00FF);
 
 	SetFlag(B, 1);
-	write(0x0100 + sp, sr);
-	sp--;
+	pushtostack(sr);
 	SetFlag(B, 0);
 
 	pc = (uint16_t)read(0xFFFE) | ((uint16_t)read(0xFFFF) << 8);
@@ -550,10 +553,8 @@ uint8_t cpu::JSR() {
 
 	pc--;
 
-	write(0x0100 + sp, (pc >> 8) & 0x00FF);
-	sp--;
-	write(0x0100 + sp, pc & 0x00FF);
-	sp--;
+	pushtostack((pc >> 8) & 0x00FF);
+	pushtostack(pc & 0x00FF);
 
 	pc = addr_abs;
 }
@@ -588,8 +589,59 @@ uint8_t cpu::LDY() {
 
 }
 
+uint8_t cpu::LSR() {
+	fetch();
+	SetFlag(C, fetched & 0x0001);
+	auto temp = fetched >> 1;
+	SetFlag(Z, (temp & 0x00FF) == 0x0000);
+	SetFlag(N, false);
+	if (lookup[opcode].addressingmode == &cpu::IMP)
+		accumulator = temp & 0x00FF;
+	else
+		write(addr_abs, temp & 0x00FF);
+	return 0;
+}
 
+uint8_t cpu::NOP() {
+	return 0;
+}
 
+uint8_t cpu::ORA() {
+	fetch();
+	auto temp = fetched | accumulator;
+	SetFlag(N, (temp & 0x80));
+	SetFlag(Z, (temp == 0x00));
+	accumulator = temp;
+	return 1;
+}
+
+uint8_t cpu::PHA() {
+	pushtostack(accumulator);
+	return 0;
+}
+
+uint8_t cpu::PHP() {
+	SetFlag(B, true);
+	SetFlag(U, true);
+	pushtostack(sr);
+	return 0;
+}
+
+uint8_t cpu::PLA() {
+	accumulator = popfromstack();
+	SetFlag(N, accumulator & 0x80);
+	SetFlag(Z, accumulator == 0x00);
+	return 0;
+}
+
+uint8_t cpu::PLP() {
+	sr = popfromstack();
+	return 0;
+}
+
+uint8_t cpu::ROL() {
+
+}
 
 
 

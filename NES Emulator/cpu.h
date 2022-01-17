@@ -15,7 +15,8 @@ public:
 	void reset();
 	void interrupt();
 	void nminterrupt();
-
+	void pushtostack(uint8_t data);
+	uint8_t popfromstack();
 
 	enum statusflagslist {
 		C = (1 << 0),

@@ -299,7 +299,6 @@ void cpu::pushtostack(uint8_t data) {
 uint8_t cpu::popfromstack() {
 	sp++;
 	auto data = read(0x0100 + sp); 
-	write(0x0100 + sp, 0x00);
 	return data;
 }
 
@@ -640,8 +639,32 @@ uint8_t cpu::PLP() {
 }
 
 uint8_t cpu::ROL() {
-
+	fetch();
+	auto temp = (uint16_t)fetched << 1 | GetFlag(C);
+	SetFlag(C, temp & 0xFF00);
+	SetFlag(Z, (temp & 0x00FF) == 0x0000);
+	SetFlag(N, temp & 0x0080);
+	if (lookup[opcode].addressingmode == &cpu::IMP) {
+		accumulator = temp & 0x00FF;
+	}
+	else {
+		write(addr_abs, temp & 0x00FF);
+	}
+	return 0;
+	
 }
 
+uint8_t cpu::ROR() {
+	fetch();
+	auto temp = (uint16_t)(GetFlag(C) << 7) | (fetched >> 1);
+	SetFlag(C, fetched & 0x01);
+	SetFlag(Z, (temp & 0x00FF) == 0x00);
+	SetFlag(N, temp & 0x0080);
+	if (lookup[opcode].addressingmode == &cpu::IMP)
+		accumulator = temp & 0x00FF;
+	else
+		write(addr_abs, temp & 0x00FF);
+	return 0;
+}
 
 

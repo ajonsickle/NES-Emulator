@@ -1,6 +1,10 @@
 #pragma once
-#include <string>
+
 #include <vector>
+
+#include <string>
+#include <map>
+
 class bus;
 
 class cpu
@@ -8,14 +12,13 @@ class cpu
 public:
 	cpu();
 
-	void connectBus(bus *x) {
-		bus = x;
-	}
+	void connectBus(bus* n) { bus = n; }
 	void clock();
 	void reset();
 	void interrupt();
 	void nminterrupt();
 	void pushtostack(uint8_t data);
+	bool complete();
 	uint8_t popfromstack();
 
 	enum statusflagslist {
@@ -36,6 +39,8 @@ public:
 	uint8_t sp = 0x00;
 	uint8_t sr = 0x00;
 	
+	std::map<uint16_t, std::string> disassemble(uint16_t nStart, uint16_t nStop);
+
 private:
 	//opcodes
 
@@ -61,53 +66,39 @@ private:
 	uint8_t SEC();
 	uint8_t RTI();
 	uint8_t EOR();
-	uint8_t SRE();
 	uint8_t LSR();
 	uint8_t PHA();
-	uint8_t ALR();
 	uint8_t JMP();
 	uint8_t BVC();
 	uint8_t CLI();
 	uint8_t TSX();
 	uint8_t RTS();
 	uint8_t ADC();
-	uint8_t RRA();
 	uint8_t ROR();
-	uint8_t ARR();
 	uint8_t BVS();
 	uint8_t SEI();
 	uint8_t STA();
-	uint8_t SAX();
 	uint8_t STY();
 	uint8_t STX();
 	uint8_t DEY();
 	uint8_t TXS();
 	uint8_t TXA();
-	uint8_t XAA();
 	uint8_t BCC();
-	uint8_t AHX();
 	uint8_t TYA();
-	uint8_t TAS();
-	uint8_t SHY();
 	uint8_t LDY();
 	uint8_t LDA();
 	uint8_t LDX();
-	uint8_t LAX();
 	uint8_t TAY();
 	uint8_t TAX();
 	uint8_t BCS();
 	uint8_t CLV();
-	uint8_t LAS();
 	uint8_t CPY();
 	uint8_t CMP();
-	uint8_t DCP();
 	uint8_t DEC();
 	uint8_t INY();
-	uint8_t AXS();
 	uint8_t BNE();
 	uint8_t CLD();
 	uint8_t CPX();
-	uint8_t ISC();
 	uint8_t INC();
 	uint8_t INX();
 	uint8_t BEQ();

@@ -141,11 +141,12 @@
   <ItemGroup>
     <ClCompile Include="bus.cpp" />
     <ClCompile Include="cpu.cpp" />
-    <ClCompile Include="NES Emulator.cpp" />
+    <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bus.h" />
     <ClInclude Include="cpu.h" />
+    <ClInclude Include="olcPixelGameEngine.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

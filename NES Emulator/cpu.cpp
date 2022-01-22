@@ -1,7 +1,7 @@
 #include "cpu.h"
 #include <cstdint>
 #include "bus.h"
-#include "bus.cpp"
+#include <map>
 cpu::cpu() {
 	using a = cpu;
 	lookup =
@@ -24,11 +24,12 @@ cpu::cpu() {
 		{ "BEQ", &a::BEQ, &a::REL, 2 },{ "SBC", &a::SBC, &a::IZY, 5 },{ "???", &a::XXX, &a::IMP, 2 },{ "???", &a::XXX, &a::IMP, 8 },{ "???", &a::NOP, &a::IMP, 4 },{ "SBC", &a::SBC, &a::ZPX, 4 },{ "INC", &a::INC, &a::ZPX, 6 },{ "???", &a::XXX, &a::IMP, 6 },{ "SED", &a::SED, &a::IMP, 2 },{ "SBC", &a::SBC, &a::ABY, 4 },{ "NOP", &a::NOP, &a::IMP, 2 },{ "???", &a::XXX, &a::IMP, 7 },{ "???", &a::NOP, &a::IMP, 4 },{ "SBC", &a::SBC, &a::ABX, 4 },{ "INC", &a::INC, &a::ABX, 7 },{ "???", &a::XXX, &a::IMP, 7 },
 	};
 }
+
 void cpu::write(uint16_t address, uint8_t data) {
 	bus->write(address, data);
 };
 uint8_t cpu::read(uint16_t address) {
-	return bus->read(address);
+	return bus->read(address, false);
 }
 void cpu::clock() {
 	if (cycles == 0) {
@@ -193,8 +194,8 @@ uint8_t cpu::REL()
 uint8_t cpu::fetch() {
 	if (lookup[opcode].addressingmode != &cpu::IMP) {
 		fetched = read(addr_abs);
-		return fetched;
 	}
+	return fetched;
 }
 
 uint8_t cpu::AND() {
@@ -556,6 +557,7 @@ uint8_t cpu::JSR() {
 	pushtostack(pc & 0x00FF);
 
 	pc = addr_abs;
+	return 0;
 }
 
 uint8_t cpu::LDA() {
@@ -665,6 +667,192 @@ uint8_t cpu::ROR() {
 	else
 		write(addr_abs, temp & 0x00FF);
 	return 0;
+}
+
+uint8_t cpu::RTS() {
+	auto temp = popfromstack();
+	temp++;
+	pc = temp;
+	return 0;
+}
+
+uint8_t cpu::SEC() {
+	SetFlag(C, true);
+	return 0;
+}
+
+uint8_t cpu::SED() {
+	SetFlag(D, true);
+	return 0;
+}
+
+uint8_t cpu::SEI() {
+	SetFlag(ID, true);
+	return 0;
+}
+
+uint8_t cpu::STA() {
+	write(addr_abs, accumulator);
+	return 0;
+}
+
+uint8_t cpu::STX() {
+	write(addr_abs, xindex);
+	return 0;
+}
+
+uint8_t cpu::STY() {
+	write(addr_abs, yindex);
+	return 0;
+}
+
+uint8_t cpu::TAX() {
+	xindex = accumulator;
+	SetFlag(N, xindex & 0x80);
+	SetFlag(Z, xindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::TAY() {
+	yindex = accumulator;
+	SetFlag(N, yindex & 0x80);
+	SetFlag(Z, yindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::TSX() {
+	xindex = sp;
+	SetFlag(N, yindex & 0x80);
+	SetFlag(Z, yindex == 0x00);
+	return 0;
+}
+
+uint8_t cpu::TXA() {
+	accumulator = xindex;
+	SetFlag(N, accumulator & 0x80);
+	SetFlag(Z, accumulator == 0x00);
+	return 0;
+}
+
+uint8_t cpu::TXS() {
+	sp = xindex;
+	return 0;
+}
+
+uint8_t cpu::TYA() {
+	accumulator = yindex;
+	SetFlag(N, accumulator & 0x80);
+	SetFlag(Z, accumulator == 0x00);
+	return 0;
+}
+
+uint8_t cpu::XXX() {
+	return 0;
+}
+
+bool cpu::complete()
+{
+	return cycles == 0;
+}
+
+// this function is copy and pasted
+std::map<uint16_t, std::string> cpu::disassemble(uint16_t nStart, uint16_t nStop)
+{
+	uint32_t addr = nStart;
+	uint8_t value = 0x00, lo = 0x00, hi = 0x00;
+	std::map<uint16_t, std::string> mapLines;
+	uint16_t line_addr = 0;
+
+	auto hex = [](uint32_t n, uint8_t d)
+	{
+		std::string s(d, '0');
+		for (int i = d - 1; i >= 0; i--, n >>= 4)
+			s[i] = "0123456789ABCDEF"[n & 0xF];
+		return s;
+	};
+
+	while (addr <= (uint32_t)nStop)
+	{
+		line_addr = addr;
+
+		std::string sInst = "$" + hex(addr, 4) + ": ";
+
+		uint8_t opcode = bus->read(addr, true); addr++;
+		sInst += lookup[opcode].name + " ";
+
+		if (lookup[opcode].addressingmode == &cpu::IMP)
+		{
+			sInst += " {IMP}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::IMM)
+		{
+			value = bus->read(addr, true); addr++;
+			sInst += "#$" + hex(value, 2) + " {IMM}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::ZP0)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "$" + hex(lo, 2) + " {ZP0}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::ZPX)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "$" + hex(lo, 2) + ", X {ZPX}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::ZPY)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "$" + hex(lo, 2) + ", Y {ZPY}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::IZX)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "($" + hex(lo, 2) + ", X) {IZX}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::IZY)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "($" + hex(lo, 2) + "), Y {IZY}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::ABS)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = bus->read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + " {ABS}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::ABX)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = bus->read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", X {ABX}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::ABY)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = bus->read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", Y {ABY}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::IND)
+		{
+			lo = bus->read(addr, true); addr++;
+			hi = bus->read(addr, true); addr++;
+			sInst += "($" + hex((uint16_t)(hi << 8) | lo, 4) + ") {IND}";
+		}
+		else if (lookup[opcode].addressingmode == &cpu::REL)
+		{
+			value = bus->read(addr, true); addr++;
+			sInst += "$" + hex(value, 2) + " [$" + hex(addr + value, 4) + "] {REL}";
+		}
+
+		mapLines[line_addr] = sInst;
+	}
+
+	return mapLines;
 }
 
 

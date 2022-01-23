@@ -31,3 +31,15 @@ uint8_t bus::read(uint16_t address, bool readOnly) {
 	}
 	return data;
 }
+
+void bus::insertCartridge(const std::shared_ptr<cartridge>& cartridge) {
+	this->cart = cartridge;
+	ppu.connectCartridge(cartridge);
+}
+void bus::reset() {
+	cpu.reset();
+	clockCounter = 0;
+}
+void bus::clock() {
+
+}

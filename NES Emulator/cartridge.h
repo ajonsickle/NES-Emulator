@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 class cartridge
 {
 	cartridge();
@@ -9,6 +10,6 @@ public:
 	bool write(uint16_t address, uint8_t data);
 
 	bool ppuRead(uint16_t address, uint8_t &data);
-	bool ppuWrite(uint16_t address, uint8_t data)
+	bool ppuWrite(uint16_t address, uint8_t data);
 };
 

@@ -82,3 +82,7 @@ uint8_t ppu::ppuread(uint16_t address, bool readOnly) {
 void ppu::ppuwrite(uint16_t address, uint8_t data) {
 	address = address & 0x3FFF;
 }
+
+void ppu::connectCartridge(const std::shared_ptr<cartridge>& cartridge) {
+	this->cart = cartridge;
+}

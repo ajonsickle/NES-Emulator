@@ -2,6 +2,8 @@
 #include <cstdint>
 #include "cpu.h"
 #include <array>
+#include "ppu.h"
+#include "cartridge.h"
 
 class bus
 {
@@ -11,7 +13,8 @@ public:
 	~bus();
 public: 
 	cpu cpu;
-	std::array<uint8_t, 64 * 1024> ram;
+	ppu ppu;
+	std::array<uint8_t, 2048> ram;
 
 public:
 	void write(uint16_t address, uint8_t data);

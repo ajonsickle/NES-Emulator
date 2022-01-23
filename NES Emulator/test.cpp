@@ -167,7 +167,6 @@ public:
 
 
 		DrawString(10, 370, "SPACE = Step Instruction    R = RESET    I = IRQ    N = NMI");
-
 		return true;
 	}
 };

@@ -140,13 +140,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="bus.cpp" />
+    <ClCompile Include="cartridge.cpp" />
     <ClCompile Include="cpu.cpp" />
+    <ClCompile Include="ppu.cpp" />
     <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bus.h" />
+    <ClInclude Include="cartridge.h" />
     <ClInclude Include="cpu.h" />
     <ClInclude Include="olcPixelGameEngine.h" />
+    <ClInclude Include="ppu.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

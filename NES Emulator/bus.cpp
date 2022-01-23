@@ -1,4 +1,5 @@
 #include "bus.h"
+#include "ppu.h"
 
 bus::bus() {
 
@@ -12,13 +13,21 @@ bus::~bus()
 }
 
 void bus::write(uint16_t address, uint8_t data) {
-	if (address >= 0x0000 && address <= 0xFFFF) {
-		ram[address] = data;
+	if (address >= 0x0000 && address <= 0x1FFF) {
+		ram[address & 0x07FF] = data;
+	}
+	else if (address >= 0x2000 && address <= 0x3FFF) {
+		ppu.write(address & 0x0007, data);
 	}
 }
 uint8_t bus::read(uint16_t address, bool readOnly) {
-	if (address >= 0x0000 && address <= 0xFFFF) {
-		return ram[address];
+	uint8_t data = 0x00;
+	if (address >= 0x0000 && address <= 0x1FFF) {
+		// mirroring
+		data = ram[address & 0x07FF];
 	}
-	return 0x00;
+	else if (address >= 0x2000 && address <= 0x3FFF) {
+		data = ppu.read(address & 0x0007, readOnly);
+	}
+	return data;
 }

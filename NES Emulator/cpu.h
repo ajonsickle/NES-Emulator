@@ -122,9 +122,7 @@ private:
 	uint8_t IND();
 	uint8_t IZX();	
 	uint8_t IZY();
-
-
-private:
+// other
 	bus* bus = nullptr;
 	uint8_t read(uint16_t address);
 	void write(uint16_t address, uint8_t data);

@@ -13,7 +13,10 @@ bus::~bus()
 }
 
 void bus::write(uint16_t address, uint8_t data) {
-	if (address >= 0x0000 && address <= 0x1FFF) {
+	if (cart->write(address, data) == true) {
+
+	}
+	else if (address >= 0x0000 && address <= 0x1FFF) {
 		ram[address & 0x07FF] = data;
 	}
 	else if (address >= 0x2000 && address <= 0x3FFF) {
@@ -22,7 +25,10 @@ void bus::write(uint16_t address, uint8_t data) {
 }
 uint8_t bus::read(uint16_t address, bool readOnly) {
 	uint8_t data = 0x00;
-	if (address >= 0x0000 && address <= 0x1FFF) {
+	if (cart->read(address, data) == true) {
+
+	}
+	else if (address >= 0x0000 && address <= 0x1FFF) {
 		// mirroring
 		data = ram[address & 0x07FF];
 	}

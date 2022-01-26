@@ -846,7 +846,7 @@ std::map<uint16_t, std::string> cpu::disassemble(uint16_t nStart, uint16_t nStop
 		else if (lookup[opcode].addressingmode == &cpu::REL)
 		{
 			value = bus->read(addr, true); addr++;
-			sInst += "$" + hex(value, 2) + " [$" + hex(addr + value, 4) + "] {REL}";
+			sInst += "$" + hex(value, 2) + " [$" + hex(addr + (int8_t)value, 4) + "] {REL}";
 		}
 
 		mapLines[line_addr] = sInst;

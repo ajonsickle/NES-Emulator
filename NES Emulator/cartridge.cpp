@@ -2,7 +2,12 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include "mapper000.h"
 
+bool cartridge::ImageValid()
+{
+	return bImageValid;
+}
 cartridge::cartridge(const std::string& romfile) {
 	/*
 	iNES:
@@ -25,7 +30,7 @@ cartridge::cartridge(const std::string& romfile) {
 	11-15: Unused padding (should be filled with zero, but some rippers put their name across bytes 7-15)*/
 	struct header {
 		// char is 1 byte
-		std::string filenames[4];
+		char filenames[4];
 		uint8_t prgromsize;
 		uint8_t chrromsize;
 		uint8_t flag6;
@@ -33,8 +38,13 @@ cartridge::cartridge(const std::string& romfile) {
 		uint8_t flag8;
 		uint8_t flag9;
 		uint8_t flag10;
-		std::string padding[5];
+		char padding[5];
 	} headerr;
+
+
+	bImageValid = false;
+
+
 
 	std::ifstream streamreader;
 	streamreader.open(romfile, std::ifstream::binary);
@@ -46,8 +56,8 @@ cartridge::cartridge(const std::string& romfile) {
 			// offset 512 from current position in the stream
 			streamreader.seekg(512, std::ios_base::cur);
 		}
-		// determine whether mapper 1 or 2 is being used. low nibble of flag 6 contains mapper number so it must be shifted left by 4, upper nibble of flag 7 contains mapper number so it stays as is
-		mapper = (headerr.flag7) | (headerr.flag6 << 4);
+		// determine which mapper is being used. low nibble of flag 6 contains mapper number so it must be shifted left by 4, upper nibble of flag 7 contains mapper number so it stays as is
+		mapperid = ((headerr.flag7 >> 4) << 4) | (headerr.flag6 >> 4);
 		// nes roms have multiple file formats
 		uint8_t filetype = 1;
 		if (filetype == 0) {
@@ -66,7 +76,15 @@ cartridge::cartridge(const std::string& romfile) {
 		if (filetype == 2) {
 
 		}
+		// select mapper
+		switch (mapperid) {
+			case 0:
+				//mapper 000
+				mapperptr = std::make_shared<mapper000>(prgsections, chrsections);
+			break;
+		}
 		//ignoring playchoice stuff
+		bImageValid = true;
 		streamreader.close();
 	}
 	
@@ -74,16 +92,35 @@ cartridge::cartridge(const std::string& romfile) {
 cartridge::~cartridge() {
 
 }
-// doesn't actually execute any reading or writing, just returns whether or not the cartridge is handling this specific read/write
-bool cartridge::read(uint16_t address, uint8_t & data) {
 
+bool cartridge::read(uint16_t address, uint8_t & data) {
+	uint32_t mapped_address = 0;
+	if (mapperptr->mapperRead(address, mapped_address)) {
+		data = prgdata[mapped_address];
+		return true;
+	} else return false;
 }
 bool cartridge::write(uint16_t address, uint8_t data) {
-
+	uint32_t mapped_address = 0;
+	if (mapperptr->mapperWrite(address, mapped_address)) {
+		data = prgdata[mapped_address];
+		return true;
+	}
+	else return false;
 }
 bool cartridge::ppuRead(uint16_t address, uint8_t& data) {
-
+	uint32_t mapped_address = 0;
+	if (mapperptr->ppuMapperRead(address, mapped_address)) {
+		data = chrdata[mapped_address];
+		return true;
+	}
+	else return false;
 }
 bool cartridge::ppuWrite(uint16_t address, uint8_t data) {
-
+	uint32_t mapped_address = 0;
+	if (mapperptr->ppuMapperWrite(address, mapped_address)) {
+		data = chrdata[mapped_address];
+		return true;
+	}
+	else return false;
 }

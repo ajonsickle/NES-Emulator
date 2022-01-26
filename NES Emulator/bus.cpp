@@ -4,7 +4,6 @@
 bus::bus() {
 
 	cpu.connectBus(this);
-	for (auto& i : ram) i = 0x0000;
 
 }
 
@@ -13,6 +12,7 @@ bus::~bus()
 }
 
 void bus::write(uint16_t address, uint8_t data) {
+	// cartridge has priority
 	if (cart->write(address, data) == true) {
 
 	}
@@ -25,6 +25,7 @@ void bus::write(uint16_t address, uint8_t data) {
 }
 uint8_t bus::read(uint16_t address, bool readOnly) {
 	uint8_t data = 0x00;
+	// cartridge has priority
 	if (cart->read(address, data) == true) {
 
 	}
@@ -47,5 +48,9 @@ void bus::reset() {
 	clockCounter = 0;
 }
 void bus::clock() {
-
+	ppu.clock();
+	if (clockCounter % 3 == 0) {
+		cpu.clock();
+	}
+	clockCounter++;
 }

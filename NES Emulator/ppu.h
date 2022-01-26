@@ -3,6 +3,8 @@
 #include "cartridge.h"
 #include <cstdint>
 
+#include "olcPixelGameEngine.h"
+
 class bus;
 
 class ppu
@@ -23,11 +25,19 @@ public:
 	uint8_t nametable[2][1024];
 	uint8_t palettes[64];
 	uint8_t patterntable[2][256 * 16];
-	uint8_t attributetable[64];
-	uint8_t oam[64 * 4];
-	uint8_t memorymap[16384];
+
+	olc::Sprite& GetScreen();
+	olc::Sprite& GetNameTable(uint8_t i);
+	olc::Sprite& GetPatternTable(uint8_t i);
+	bool frame_complete = false;
 
 private:
 	std::shared_ptr<cartridge> cart;
+	olc::Pixel  palScreen[0x40];
+	olc::Sprite sprScreen = olc::Sprite(256, 240);
+	olc::Sprite sprNameTable[2] = { olc::Sprite(256, 240), olc::Sprite(256, 240) };
+	olc::Sprite sprPatternTable[2] = { olc::Sprite(128, 128), olc::Sprite(128, 128) };
+	int16_t scanline = 0;
+	int16_t cycle = 0;
 };
 

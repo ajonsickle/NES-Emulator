@@ -1,5 +1,7 @@
 #include "mapper000.h"
 
+// https://wiki.nesdev.org/w/index.php?title=NROM
+// https://www.copetti.org/images/consoles/nes/diagram.c464dfd123bab5f03a9f07be39056625d5de0a69f01e5f57eefdfd02811cbb33.png
 mapper000::mapper000(uint8_t prgsections, uint8_t chrsections) : mapper(prgsections, chrsections) {
 
 }
@@ -32,7 +34,7 @@ bool mapper000::mapperWrite(uint16_t address, uint32_t& mapped_address) {
 }
 
 bool mapper000::ppuMapperRead(uint16_t address, uint32_t& mapped_address) {
-	//ppu read isnt affected by number of prg banks
+	// no mapping required for ppu
 	if (address >= 0x0000 && address <= 0x1FFF) {
 		mapped_address = address;
 		return true;

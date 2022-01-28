@@ -10,6 +10,7 @@ bool cartridge::ImageValid()
 }
 cartridge::cartridge(const std::string& romfile) {
 	/*
+	ttps://wiki.nesdev.org/w/index.php/INES
 	iNES:
 	Header (16 bytes)
 	Trainer, if present (0 or 512 bytes)
@@ -41,7 +42,7 @@ cartridge::cartridge(const std::string& romfile) {
 		char padding[5];
 	} headerr;
 
-
+	// bool for game engine
 	bImageValid = false;
 
 
@@ -49,6 +50,7 @@ cartridge::cartridge(const std::string& romfile) {
 	std::ifstream streamreader;
 	streamreader.open(romfile, std::ifstream::binary);
 	if (streamreader.is_open()) {
+		// istream& read (char* s, streamsize n);
 		// extracts n characters from the stream and stores them in the array pointed to by s, n is the length of the header and s is a char pointer to the memory location of header
 		streamreader.read((char*)&headerr, sizeof(header));
 		// if trainer present
@@ -57,50 +59,43 @@ cartridge::cartridge(const std::string& romfile) {
 			streamreader.seekg(512, std::ios_base::cur);
 		}
 		// determine which mapper is being used. low nibble of flag 6 contains mapper number so it must be shifted left by 4, upper nibble of flag 7 contains mapper number so it stays as is
-		mapperid = ((headerr.flag7 >> 4) << 4) | (headerr.flag6 >> 4);
-		// nes roms have multiple file formats
-		uint8_t filetype = 1;
-		if (filetype == 0) {
+		mapperid = (headerr.flag7) | (headerr.flag6 >> 4);
+		// take the number of banks of the PRG and CHR ROM and resize the PRG and CHR vector accordingly, then read from the rom file to write into the vector
+		prgsections = headerr.prgromsize;
+		prgdata.resize(prgsections * 16 * 1024);
+		streamreader.read((char*)prgdata.data(), prgdata.size());
 
-		} 
-		if (filetype == 1) {
-			// take the number of banks of the PRG and CHR ROM and resize the PRG and CHR vector accordingly, then read from the rom file to write into the vector
-			prgsections = headerr.prgromsize;
-			prgdata.resize(prgsections * 16 * 1024);
-			streamreader.read((char*)prgdata.data(), prgdata.size());
-
-			chrsections = headerr.chrromsize;
-			chrdata.resize(chrsections * 8 * 1024);
-			streamreader.read((char*)chrdata.data(), chrdata.size());
-		}
-		if (filetype == 2) {
-
-		}
+		chrsections = headerr.chrromsize;
+		chrdata.resize(chrsections * 8 * 1024);
+		streamreader.read((char*)chrdata.data(), chrdata.size());
 		// select mapper
 		switch (mapperid) {
-			case 0:
-				//mapper 000
-				mapperptr = std::make_shared<mapper000>(prgsections, chrsections);
+		case 0:
+			//mapper 000
+			mapperptr = std::make_shared<mapper000>(prgsections, chrsections);
 			break;
 		}
 		//ignoring playchoice stuff
 		bImageValid = true;
 		streamreader.close();
 	}
-	
+
 }
 cartridge::~cartridge() {
 
 }
 
-bool cartridge::read(uint16_t address, uint8_t & data) {
+bool cartridge::read(uint16_t address, uint8_t& data) {
+	// cartridge gets first priority on cpu reads so it can handle program rom if the mapper being used needs to carry out a read 
 	uint32_t mapped_address = 0;
 	if (mapperptr->mapperRead(address, mapped_address)) {
 		data = prgdata[mapped_address];
 		return true;
-	} else return false;
+	}
+	else return false;
 }
 bool cartridge::write(uint16_t address, uint8_t data) {
+	// same as read 
 	uint32_t mapped_address = 0;
 	if (mapperptr->mapperWrite(address, mapped_address)) {
 		data = prgdata[mapped_address];
@@ -109,6 +104,7 @@ bool cartridge::write(uint16_t address, uint8_t data) {
 	else return false;
 }
 bool cartridge::ppuRead(uint16_t address, uint8_t& data) {
+	// cartridge gets first priority on ppu reads so it can handle character rom if the mapper being used needs to carry out a read 
 	uint32_t mapped_address = 0;
 	if (mapperptr->ppuMapperRead(address, mapped_address)) {
 		data = chrdata[mapped_address];
@@ -117,6 +113,7 @@ bool cartridge::ppuRead(uint16_t address, uint8_t& data) {
 	else return false;
 }
 bool cartridge::ppuWrite(uint16_t address, uint8_t data) {
+	// same as write
 	uint32_t mapped_address = 0;
 	if (mapperptr->ppuMapperWrite(address, mapped_address)) {
 		data = chrdata[mapped_address];

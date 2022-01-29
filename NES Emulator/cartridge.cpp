@@ -98,7 +98,7 @@ bool cartridge::write(uint16_t address, uint8_t data) {
 	// same as read 
 	uint32_t mapped_address = 0;
 	if (mapperptr->mapperWrite(address, mapped_address)) {
-		data = prgdata[mapped_address];
+		prgdata[mapped_address] = data;
 		return true;
 	}
 	else return false;
@@ -116,7 +116,7 @@ bool cartridge::ppuWrite(uint16_t address, uint8_t data) {
 	// same as write
 	uint32_t mapped_address = 0;
 	if (mapperptr->ppuMapperWrite(address, mapped_address)) {
-		data = chrdata[mapped_address];
+		chrdata[mapped_address] = data;
 		return true;
 	}
 	else return false;

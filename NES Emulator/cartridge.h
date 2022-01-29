@@ -15,10 +15,10 @@ public:
 	cartridge(const std::string& romfile);
 	~cartridge();
 	// as the cartridge has priority over all the read/write functions of the cpu and ppu there must be a function to let the other components know that it is handling the read/write	
-	bool read(uint16_t address, uint8_t &data);
+	bool read(uint16_t address, uint8_t& data);
 	bool write(uint16_t address, uint8_t data);
 
-	bool ppuRead(uint16_t address, uint8_t &data);
+	bool ppuRead(uint16_t address, uint8_t& data);
 	bool ppuWrite(uint16_t address, uint8_t data);
 
 	// for the game engine

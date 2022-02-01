@@ -8,7 +8,7 @@ mapper000::mapper000(uint8_t prgsections, uint8_t chrsections) : mapper(prgsecti
 mapper000::~mapper000() {
 
 }
-// & = ref 
+
 bool mapper000::mapperRead(uint16_t address, uint32_t& mapped_address) {
 	// rom data is held only in $8000-$FFFF
 	if (address >= 0x8000 && address <= 0xFFFF) {

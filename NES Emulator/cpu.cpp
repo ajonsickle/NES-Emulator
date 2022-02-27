@@ -1,87 +1,1500 @@
-#include "cpu.h"
-#include <cstdint>
+﻿#include "cpu.h"
 #include "bus.h"
-#include <map>
-// constructor
-cpu::cpu() {
-	// instruction set op code matrix. based on http://archive.6502.org/datasheets/rockwell_r65c00_microprocessors.pdf page 9
-	// ??? represents any illegal opcodes or NOP operations. these are represented by blank spaces in the pdf
-	lookup =
-	{
-		{ "BRK", &cpu::BRK, &cpu::IMM, 7 },{ "ORA", &cpu::ORA, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 3 },{ "ORA", &cpu::ORA, &cpu::ZP0, 3 },{ "ASL", &cpu::ASL, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "PHP", &cpu::PHP, &cpu::IMP, 3 },{ "ORA", &cpu::ORA, &cpu::IMM, 2 },{ "ASL", &cpu::ASL, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ORA", &cpu::ORA, &cpu::ABS, 4 },{ "ASL", &cpu::ASL, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BPL", &cpu::BPL, &cpu::REL, 2 },{ "ORA", &cpu::ORA, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ORA", &cpu::ORA, &cpu::ZPX, 4 },{ "ASL", &cpu::ASL, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "CLC", &cpu::CLC, &cpu::IMP, 2 },{ "ORA", &cpu::ORA, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ORA", &cpu::ORA, &cpu::ABX, 4 },{ "ASL", &cpu::ASL, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "JSR", &cpu::JSR, &cpu::ABS, 6 },{ "AND", &cpu::AND, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "BIT", &cpu::BIT, &cpu::ZP0, 3 },{ "AND", &cpu::AND, &cpu::ZP0, 3 },{ "ROL", &cpu::ROL, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "PLP", &cpu::PLP, &cpu::IMP, 4 },{ "AND", &cpu::AND, &cpu::IMM, 2 },{ "ROL", &cpu::ROL, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "BIT", &cpu::BIT, &cpu::ABS, 4 },{ "AND", &cpu::AND, &cpu::ABS, 4 },{ "ROL", &cpu::ROL, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BMI", &cpu::BMI, &cpu::REL, 2 },{ "AND", &cpu::AND, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "AND", &cpu::AND, &cpu::ZPX, 4 },{ "ROL", &cpu::ROL, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "SEC", &cpu::SEC, &cpu::IMP, 2 },{ "AND", &cpu::AND, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "AND", &cpu::AND, &cpu::ABX, 4 },{ "ROL", &cpu::ROL, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "RTI", &cpu::RTI, &cpu::IMP, 6 },{ "EOR", &cpu::EOR, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 3 },{ "EOR", &cpu::EOR, &cpu::ZP0, 3 },{ "LSR", &cpu::LSR, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "PHA", &cpu::PHA, &cpu::IMP, 3 },{ "EOR", &cpu::EOR, &cpu::IMM, 2 },{ "LSR", &cpu::LSR, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "JMP", &cpu::JMP, &cpu::ABS, 3 },{ "EOR", &cpu::EOR, &cpu::ABS, 4 },{ "LSR", &cpu::LSR, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BVC", &cpu::BVC, &cpu::REL, 2 },{ "EOR", &cpu::EOR, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "EOR", &cpu::EOR, &cpu::ZPX, 4 },{ "LSR", &cpu::LSR, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "CLI", &cpu::CLI, &cpu::IMP, 2 },{ "EOR", &cpu::EOR, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "EOR", &cpu::EOR, &cpu::ABX, 4 },{ "LSR", &cpu::LSR, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "RTS", &cpu::RTS, &cpu::IMP, 6 },{ "ADC", &cpu::ADC, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 3 },{ "ADC", &cpu::ADC, &cpu::ZP0, 3 },{ "ROR", &cpu::ROR, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "PLA", &cpu::PLA, &cpu::IMP, 4 },{ "ADC", &cpu::ADC, &cpu::IMM, 2 },{ "ROR", &cpu::ROR, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "JMP", &cpu::JMP, &cpu::IND, 5 },{ "ADC", &cpu::ADC, &cpu::ABS, 4 },{ "ROR", &cpu::ROR, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BVS", &cpu::BVS, &cpu::REL, 2 },{ "ADC", &cpu::ADC, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ADC", &cpu::ADC, &cpu::ZPX, 4 },{ "ROR", &cpu::ROR, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "SEI", &cpu::SEI, &cpu::IMP, 2 },{ "ADC", &cpu::ADC, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ADC", &cpu::ADC, &cpu::ABX, 4 },{ "ROR", &cpu::ROR, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "STA", &cpu::STA, &cpu::IZX, 6 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "STY", &cpu::STY, &cpu::ZP0, 3 },{ "STA", &cpu::STA, &cpu::ZP0, 3 },{ "STX", &cpu::STX, &cpu::ZP0, 3 },{ "???", &cpu::XXX, &cpu::IMP, 3 },{ "DEY", &cpu::DEY, &cpu::IMP, 2 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "TXA", &cpu::TXA, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "STY", &cpu::STY, &cpu::ABS, 4 },{ "STA", &cpu::STA, &cpu::ABS, 4 },{ "STX", &cpu::STX, &cpu::ABS, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "BCC", &cpu::BCC, &cpu::REL, 2 },{ "STA", &cpu::STA, &cpu::IZY, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "STY", &cpu::STY, &cpu::ZPX, 4 },{ "STA", &cpu::STA, &cpu::ZPX, 4 },{ "STX", &cpu::STX, &cpu::ZPY, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },{ "TYA", &cpu::TYA, &cpu::IMP, 2 },{ "STA", &cpu::STA, &cpu::ABY, 5 },{ "TXS", &cpu::TXS, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "???", &cpu::NOP, &cpu::IMP, 5 },{ "STA", &cpu::STA, &cpu::ABX, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "LDY", &cpu::LDY, &cpu::IMM, 2 },{ "LDA", &cpu::LDA, &cpu::IZX, 6 },{ "LDX", &cpu::LDX, &cpu::IMM, 2 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "LDY", &cpu::LDY, &cpu::ZP0, 3 },{ "LDA", &cpu::LDA, &cpu::ZP0, 3 },{ "LDX", &cpu::LDX, &cpu::ZP0, 3 },{ "???", &cpu::XXX, &cpu::IMP, 3 },{ "TAY", &cpu::TAY, &cpu::IMP, 2 },{ "LDA", &cpu::LDA, &cpu::IMM, 2 },{ "TAX", &cpu::TAX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "LDY", &cpu::LDY, &cpu::ABS, 4 },{ "LDA", &cpu::LDA, &cpu::ABS, 4 },{ "LDX", &cpu::LDX, &cpu::ABS, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "BCS", &cpu::BCS, &cpu::REL, 2 },{ "LDA", &cpu::LDA, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "LDY", &cpu::LDY, &cpu::ZPX, 4 },{ "LDA", &cpu::LDA, &cpu::ZPX, 4 },{ "LDX", &cpu::LDX, &cpu::ZPY, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },{ "CLV", &cpu::CLV, &cpu::IMP, 2 },{ "LDA", &cpu::LDA, &cpu::ABY, 4 },{ "TSX", &cpu::TSX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 4 },{ "LDY", &cpu::LDY, &cpu::ABX, 4 },{ "LDA", &cpu::LDA, &cpu::ABX, 4 },{ "LDX", &cpu::LDX, &cpu::ABY, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "CPY", &cpu::CPY, &cpu::IMM, 2 },{ "CMP", &cpu::CMP, &cpu::IZX, 6 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "CPY", &cpu::CPY, &cpu::ZP0, 3 },{ "CMP", &cpu::CMP, &cpu::ZP0, 3 },{ "DEC", &cpu::DEC, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "INY", &cpu::INY, &cpu::IMP, 2 },{ "CMP", &cpu::CMP, &cpu::IMM, 2 },{ "DEX", &cpu::DEX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "CPY", &cpu::CPY, &cpu::ABS, 4 },{ "CMP", &cpu::CMP, &cpu::ABS, 4 },{ "DEC", &cpu::DEC, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BNE", &cpu::BNE, &cpu::REL, 2 },{ "CMP", &cpu::CMP, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "CMP", &cpu::CMP, &cpu::ZPX, 4 },{ "DEC", &cpu::DEC, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "CLD", &cpu::CLD, &cpu::IMP, 2 },{ "CMP", &cpu::CMP, &cpu::ABY, 4 },{ "NOP", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "CMP", &cpu::CMP, &cpu::ABX, 4 },{ "DEC", &cpu::DEC, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "CPX", &cpu::CPX, &cpu::IMM, 2 },{ "SBC", &cpu::SBC, &cpu::IZX, 6 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "CPX", &cpu::CPX, &cpu::ZP0, 3 },{ "SBC", &cpu::SBC, &cpu::ZP0, 3 },{ "INC", &cpu::INC, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "INX", &cpu::INX, &cpu::IMP, 2 },{ "SBC", &cpu::SBC, &cpu::IMM, 2 },{ "NOP", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::SBC, &cpu::IMP, 2 },{ "CPX", &cpu::CPX, &cpu::ABS, 4 },{ "SBC", &cpu::SBC, &cpu::ABS, 4 },{ "INC", &cpu::INC, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BEQ", &cpu::BEQ, &cpu::REL, 2 },{ "SBC", &cpu::SBC, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "SBC", &cpu::SBC, &cpu::ZPX, 4 },{ "INC", &cpu::INC, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },{ "SED", &cpu::SED, &cpu::IMP, 2 },{ "SBC", &cpu::SBC, &cpu::ABY, 4 },{ "NOP", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "SBC", &cpu::SBC, &cpu::ABX, 4 },{ "INC", &cpu::INC, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-	};
-}
-// destructor 
-cpu::~cpu() {
+
+// Constructor
+cpu::cpu()
+{
 
 }
+
 // calls the bus write function, writes a byte of data to the specified address in ram 
 void cpu::write(uint16_t address, uint8_t data) {
 	bus->write(address, data);
 };
 // calls bus read function, reads a byte of data from the address specified in ram
 uint8_t cpu::read(uint16_t address) {
-	return bus->read(address, false);
+	return bus->read(address);
 }
+
+
+// method to check whether the current opcode uses implied addressing or not 
+bool cpu::implied(uint8_t opcode) {
+	if (opcode == 0 || opcode == 2 || opcode == 3 || opcode == 4 || opcode == 7 || opcode == 8 || opcode == 10 || opcode == 11 || opcode == 12 || opcode == 15 || opcode == 18 || opcode == 19 || opcode == 20 || opcode == 23 || opcode == 24 || opcode == 26 || opcode == 27 || opcode == 28
+		|| opcode == 31 || opcode == 34 || opcode == 35 || opcode == 39 || opcode == 40 || opcode == 42 || opcode == 43 || opcode == 47 || opcode == 50 || opcode == 51 || opcode == 52 || opcode == 55 || opcode == 56 || opcode == 58 || opcode == 59 || opcode == 60 || opcode == 63
+		|| opcode == 64 || opcode == 66 || opcode == 67 || opcode == 68 || opcode == 71 || opcode == 72 || opcode == 74 || opcode == 75 || opcode == 79 || opcode == 82 || opcode == 83 || opcode == 84 || opcode == 87 || opcode == 88 || opcode == 90 || opcode == 91
+		|| opcode == 92 || opcode == 95 || opcode == 96 || opcode == 98 || opcode == 99 || opcode == 100 || opcode == 103 || opcode == 104 || opcode == 106 || opcode == 107 || opcode == 111 || opcode == 114 || opcode == 115 || opcode == 116 || opcode == 119
+		|| opcode == 120 || opcode == 122 || opcode == 123 || opcode == 124 || opcode == 127 || opcode == 128 || opcode == 130 || opcode == 131 || opcode == 135 || opcode == 136 || opcode == 137 || opcode == 138 || opcode == 139 || opcode == 143 || opcode == 146
+		|| opcode == 147 || opcode == 151 || opcode == 152 || opcode == 154 || opcode == 155 || opcode == 156 || opcode == 158 || opcode == 159 || opcode == 163 || opcode == 167 || opcode == 168 || opcode == 170 || opcode == 171 || opcode == 175 || opcode == 178
+		|| opcode == 179 || opcode == 183 || opcode == 184 || opcode == 186 || opcode == 187 || opcode == 191 || opcode == 194 || opcode == 195 || opcode == 199 || opcode == 200 || opcode == 202 || opcode == 203 || opcode == 207 || opcode == 210 || opcode == 211 || opcode == 212
+		|| opcode == 215 || opcode == 216 || opcode == 218 || opcode == 219 || opcode == 220 || opcode == 223 || opcode == 226 || opcode == 227 || opcode == 231 || opcode == 232 || opcode == 234 || opcode == 235 || opcode == 239 || opcode == 242
+		|| opcode == 243 || opcode == 244 || opcode == 247 || opcode == 248 || opcode == 250 || opcode == 251 || opcode == 252 || opcode == 255) return true;
+	return false;
+}
+
+
 // if there are 0 cycles left to perform, then the next instruction is ready to be fetched. the opcode is read from the program counter and the program counter is incremented as in the fetch execute cycle,
-// then the lookup table is referenced to find the number of cycles that are needed. there are also 2 variables for additional cycles, as sometimes an addressing mode/instruction will require 
+// then the opcode is looked up to find the addressing mode and the function is called. there are also 2 variables for additional cycles, as sometimes an addressing mode/instruction will require 
 // extra clock cycles to finish processing, so every addressing mode and opcode function return a value to represent this. these values are added on to the cycles counter. if cycles is not 0, cycles is decremented
 void cpu::clock() {
 	if (cycles == 0) {
 		opcode = read(pc);
+		SetStatusFlag('U', true);
 		pc++;
-		cycles = lookup[opcode].cycles;
-		uint8_t additional_cycle1 = (this->*lookup[opcode].addressingmode)();
-		uint8_t additional_cycle2 = (this->*lookup[opcode].operate)();
-		cycles += (additional_cycle1 & additional_cycle2);
+		uint8_t x = 0;
+		uint8_t y = 0;
+	http://archive.6502.org/datasheets/rockwell_r65c00_microprocessors.pdf
+	https://www.masswerk.at/6502/6502_instruction_set.html
+		switch (opcode) {
+		case 0:
+			x = IMP();
+			y = BRK();
+			cycles = 7;
+			break;
+		case 1:
+			x = IZX();
+			y = ORA();
+			cycles = 6;
+			break;
+		case 2:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 3:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 4:
+			x = IMP();
+			y = XXX();
+			cycles = 3;
+			break;
+		case 5:
+			x = ZP0();
+			y = ORA();
+			cycles = 3;
+			break;
+		case 6:
+			x = ZP0();
+			y = ASL();
+			cycles = 5;
+			break;
+		case 7:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 8:
+			x = IMP();
+			y = PHP();
+			cycles = 3;
+			break;
+		case 9:
+			x = IMM();
+			y = ORA();
+			cycles = 2;
+			break;
+		case 10:
+			x = IMP();
+			y = ASL();
+			cycles = 2;
+			break;
+		case 11:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 12:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 13:
+			x = ABS();
+			y = ORA();
+			cycles = 4;
+			break;
+		case 14:
+			x = ABS();
+			y = ASL();
+			cycles = 6;
+			break;
+		case 15:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 16:
+			x = REL();
+			y = BPL();
+			cycles = 2;
+			break;
+		case 17:
+			x = IZY();
+			y = ORA();
+			cycles = 5;
+			break;
+		case 18:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 19:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 20:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 21:
+			x = ZPX();
+			y = ORA();
+			cycles = 4;
+			break;
+		case 22:
+			x = ZPX();
+			y = ASL();
+			cycles = 6;
+			break;
+		case 23:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 24:
+			x = IMP();
+			y = CLC();
+			cycles = 2;
+			break;
+		case 25:
+			x = ABY();
+			y = ORA();
+			cycles = 4;
+			break;
+		case 26:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 27:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 28:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 29:
+			x = ABX();
+			y = ORA();
+			cycles = 4;
+			break;
+		case 30:
+			x = ABX();
+			y = ASL();
+			cycles = 7;
+			break;
+		case 31:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 32:
+			x = ABS();
+			y = JSR();
+			cycles = 6;
+			break;
+		case 33:
+			x = IZX();
+			y = AND();
+			cycles = 6;
+			break;
+		case 34:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 35:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 36:
+			x = ZP0();
+			y = BIT();
+			cycles = 3;
+			break;
+		case 37:
+			x = ZP0();
+			y = AND();
+			cycles = 3;
+			break;
+		case 38:
+			x = ZP0();
+			y = ROL();
+			cycles = 5;
+			break;
+		case 39:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 40:
+			x = IMP();
+			y = PLP();
+			cycles = 4;
+			break;
+		case 41:
+			x = IMM();
+			y = AND();
+			cycles = 2;
+			break;
+		case 42:
+			x = IMP();
+			y = ROL();
+			cycles = 2;
+			break;
+		case 43:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 44:
+			x = ABS();
+			y = BIT();
+			cycles = 4;
+			break;
+		case 45:
+			x = ABS();
+			y = AND();
+			cycles = 4;
+			break;
+		case 46:
+			x = ABS();
+			y = ROL();
+			cycles = 6;
+			break;
+		case 47:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 48:
+			x = REL();
+			y = BMI();
+			cycles = 2;
+			break;
+		case 49:
+			x = IZY();
+			y = AND();
+			cycles = 5;
+			break;
+		case 50:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 51:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 52:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 53:
+			x = ZPX();
+			y = AND();
+			cycles = 4;
+			break;
+		case 54:
+			x = ZPX();
+			y = ROL();
+			cycles = 6;
+			break;
+		case 55:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 56:
+			x = IMP();
+			y = SEC();
+			cycles = 2;
+			break;
+		case 57:
+			x = ABY();
+			y = AND();
+			cycles = 4;
+			break;
+		case 58:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 59:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 60:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 61:
+			x = ABX();
+			y = AND();
+			cycles = 4;
+			break;
+		case 62:
+			x = ABX();
+			y = ROL();
+			cycles = 7;
+			break;
+		case 63:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 64:
+			x = IMP();
+			y = RTI();
+			cycles = 6;
+			break;
+		case 65:
+			x = IZX();
+			y = EOR();
+			cycles = 6;
+			break;
+		case 66:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 67:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 68:
+			x = IMP();
+			y = XXX();
+			cycles = 3;
+			break;
+		case 69:
+			x = ZP0();
+			y = EOR();
+			cycles = 3;
+			break;
+		case 70:
+			x = ZP0();
+			y = LSR();
+			cycles = 5;
+			break;
+		case 71:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 72:
+			x = IMP();
+			y = PHA();
+			cycles = 3;
+			break;
+		case 73:
+			x = IMM();
+			y = EOR();
+			cycles = 2;
+			break;
+		case 74:
+			x = IMP();
+			y = LSR();
+			cycles = 2;
+			break;
+		case 75:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 76:
+			x = ABS();
+			y = JMP();
+			cycles = 3;
+			break;
+		case 77:
+			x = ABS();
+			y = EOR();
+			cycles = 4;
+			break;
+		case 78:
+			x = ABS();
+			y = LSR();
+			cycles = 6;
+			break;
+		case 79:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 80:
+			x = REL();
+			y = BVC();
+			cycles = 2;
+			break;
+		case 81:
+			x = IZY();
+			y = EOR();
+			cycles = 5;
+			break;
+		case 82:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 83:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 84:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 85:
+			x = ZPX();
+			y = EOR();
+			cycles = 4;
+			break;
+		case 86:
+			x = ZPX();
+			y = LSR();
+			cycles = 6;
+			break;
+		case 87:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 88:
+			x = IMP();
+			y = CLI();
+			cycles = 2;
+			break;
+		case 89:
+			x = ABY();
+			y = EOR();
+			cycles = 4;
+			break;
+		case 90:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 91:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 92:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 93:
+			x = ABX();
+			y = EOR();
+			cycles = 4;
+			break;
+		case 94:
+			x = ABX();
+			y = LSR();
+			cycles = 7;
+			break;
+		case 95:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 96:
+			x = IMP();
+			y = RTS();
+			cycles = 6;
+			break;
+		case 97:
+			x = IZX();
+			y = ADC();
+			cycles = 6;
+			break;
+		case 98:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 99:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 100:
+			x = IMP();
+			y = XXX();
+			cycles = 3;
+			break;
+		case 101:
+			x = ZP0();
+			y = ADC();
+			cycles = 3;
+			break;
+		case 102:
+			x = ZP0();
+			y = ROR();
+			cycles = 5;
+			break;
+		case 103:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 104:
+			x = IMP();
+			y = PLA();
+			cycles = 4;
+			break;
+		case 105:
+			x = IMM();
+			y = ADC();
+			cycles = 2;
+			break;
+		case 106:
+			x = IMP();
+			y = ROR();
+			cycles = 2;
+			break;
+		case 107:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 108:
+			x = IND();
+			y = JMP();
+			cycles = 5;
+			break;
+		case 109:
+			x = ABS();
+			y = ADC();
+			cycles = 4;
+			break;
+		case 110:
+			x = ABS();
+			y = ROR();
+			cycles = 6;
+			break;
+		case 111:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 112:
+			x = REL();
+			y = BVS();
+			cycles = 2;
+			break;
+		case 113:
+			x = IZY();
+			y = ADC();
+			cycles = 5;
+			break;
+		case 114:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 115:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 116:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 117:
+			x = ZPX();
+			y = ADC();
+			cycles = 4;
+			break;
+		case 118:
+			x = ZPX();
+			y = ROR();
+			cycles = 6;
+			break;
+		case 119:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 120:
+			x = IMP();
+			y = SEI();
+			cycles = 2;
+			break;
+		case 121:
+			x = ABY();
+			y = ADC();
+			cycles = 4;
+			break;
+		case 122:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 123:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 124:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 125:
+			x = ABX();
+			y = ADC();
+			cycles = 4;
+			break;
+		case 126:
+			x = ABX();
+			y = ROR();
+			cycles = 7;
+			break;
+		case 127:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 128:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 129:
+			x = IZX();
+			y = STA();
+			cycles = 6;
+			break;
+		case 130:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 131:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 132:
+			x = ZP0();
+			y = STY();
+			cycles = 3;
+			break;
+		case 133:
+			x = ZP0();
+			y = STA();
+			cycles = 3;
+			break;
+		case 134:
+			x = ZP0();
+			y = STX();
+			cycles = 3;
+			break;
+		case 135:
+			x = IMP();
+			y = XXX();
+			cycles = 3;
+			break;
+		case 136:
+			x = IMP();
+			y = DEY();
+			cycles = 2;
+			break;
+		case 137:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 138:
+			x = IMP();
+			y = TXA();
+			cycles = 2;
+			break;
+		case 139:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 140:
+			x = ABS();
+			y = STY();
+			cycles = 4;
+			break;
+		case 141:
+			x = ABS();
+			y = STA();
+			cycles = 4;
+			break;
+		case 142:
+			x = ABS();
+			y = STX();
+			cycles = 4;
+			break;
+		case 143:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 144:
+			x = REL();
+			y = BCC();
+			cycles = 2;
+			break;
+		case 145:
+			x = IZY();
+			y = STA();
+			cycles = 6;
+			break;
+		case 146:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 147:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 148:
+			x = ZPX();
+			y = STY();
+			cycles = 4;
+			break;
+		case 149:
+			x = ZPX();
+			y = STA();
+			cycles = 4;
+			break;
+		case 150:
+			x = ZPY();
+			y = STX();
+			cycles = 4;
+			break;
+		case 151:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 152:
+			x = IMP();
+			y = TYA();
+			cycles = 2;
+			break;
+		case 153:
+			x = ABY();
+			y = STA();
+			cycles = 5;
+			break;
+		case 154:
+			x = IMP();
+			y = TXS();
+			cycles = 2;
+			break;
+		case 155:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 156:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 157:
+			x = ABX();
+			y = STA();
+			cycles = 5;
+			break;
+		case 158:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 159:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 160:
+			x = IMM();
+			y = LDY();
+			cycles = 2;
+			break;
+		case 161:
+			x = IZX();
+			y = LDA();
+			cycles = 6;
+			break;
+		case 162:
+			x = IMM();
+			y = LDX();
+			cycles = 2;
+			break;
+		case 163:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 164:
+			x = ZP0();
+			y = LDY();
+			cycles = 3;
+			break;
+		case 165:
+			x = ZP0();
+			y = LDA();
+			cycles = 3;
+			break;
+		case 166:
+			x = ZP0();
+			y = LDX();
+			cycles = 3;
+			break;
+		case 167:
+			x = IMP();
+			y = XXX();
+			cycles = 3;
+			break;
+		case 168:
+			x = IMP();
+			y = TAY();
+			cycles = 2;
+			break;
+		case 169:
+			x = IMM();
+			y = LDA();
+			cycles = 2;
+			break;
+		case 170:
+			x = IMP();
+			y = TAX();
+			cycles = 2;
+			break;
+		case 171:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 172:
+			x = ABS();
+			y = LDY();
+			cycles = 4;
+			break;
+		case 173:
+			x = ABS();
+			y = LDA();
+			cycles = 4;
+			break;
+		case 174:
+			x = ABS();
+			y = LDX();
+			cycles = 4;
+			break;
+		case 175:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 176:
+			x = REL();
+			y = BCS();
+			cycles = 2;
+			break;
+		case 177:
+			x = IZY();
+			y = LDA();
+			cycles = 5;
+			break;
+		case 178:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 179:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 180:
+			x = ZPX();
+			y = LDY();
+			cycles = 4;
+			break;
+		case 181:
+			x = ZPX();
+			y = LDA();
+			cycles = 4;
+			break;
+		case 182:
+			x = ZPY();
+			y = LDX();
+			cycles = 4;
+			break;
+		case 183:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 184:
+			x = IMP();
+			y = CLV();
+			cycles = 2;
+			break;
+		case 185:
+			x = ABY();
+			y = LDA();
+			cycles = 4;
+			break;
+		case 186:
+			x = IMP();
+			y = TSX();
+			cycles = 2;
+			break;
+		case 187:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 188:
+			x = ABX();
+			y = LDY();
+			cycles = 4;
+			break;
+		case 189:
+			x = ABX();
+			y = LDA();
+			cycles = 4;
+			break;
+		case 190:
+			x = ABY();
+			y = LDX();
+			cycles = 4;
+			break;
+		case 191:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 192:
+			x = IMM();
+			y = CPY();
+			cycles = 2;
+			break;
+		case 193:
+			x = IZX();
+			y = CMP();
+			cycles = 6;
+			break;
+		case 194:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 195:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 196:
+			x = ZP0();
+			y = CPY();
+			cycles = 3;
+			break;
+		case 197:
+			x = ZP0();
+			y = CMP();
+			cycles = 3;
+			break;
+		case 198:
+			x = ZP0();
+			y = DEC();
+			cycles = 5;
+			break;
+		case 199:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 200:
+			x = IMP();
+			y = INY();
+			cycles = 2;
+			break;
+		case 201:
+			x = IMM();
+			y = CMP();
+			cycles = 2;
+			break;
+		case 202:
+			x = IMP();
+			y = DEX();
+			cycles = 2;
+			break;
+		case 203:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 204:
+			x = ABS();
+			y = CPY();
+			cycles = 4;
+			break;
+		case 205:
+			x = ABS();
+			y = CMP();
+			cycles = 4;
+			break;
+		case 206:
+			x = ABS();
+			y = DEC();
+			cycles = 6;
+			break;
+		case 207:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+
+		case 208:
+			x = REL();
+			y = BNE();
+			cycles = 2;
+			break;
+
+		case 209:
+			x = IZY();
+			y = CMP();
+			cycles = 5;
+			break;
+		case 210:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 211:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 212:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 213:
+			x = ZPX();
+			y = CMP();
+			cycles = 4;
+			break;
+		case 214:
+			x = ZPX();
+			y = DEC();
+			cycles = 6;
+			break;
+		case 215:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 216:
+			x = IMP();
+			y = CLD();
+			cycles = 2;
+			break;
+		case 217:
+			x = ABY();
+			y = CMP();
+			cycles = 4;
+			break;
+		case 218:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 219:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 220:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 221:
+			x = ABX();
+			y = CMP();
+			cycles = 4;
+			break;
+		case 222:
+			x = ABX();
+			y = DEC();
+			cycles = 7;
+			break;
+		case 223:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+
+		case 224:
+			x = IMM();
+			y = CPX();
+			cycles = 2;
+			break;
+		case 225:
+			x = IZX();
+			y = SBC();
+			cycles = 6;
+			break;
+		case 226:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 227:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 228:
+			x = ZP0();
+			y = CPX();
+			cycles = 3;
+			break;
+		case 229:
+			x = ZP0();
+			y = SBC();
+			cycles = 3;
+			break;
+		case 230:
+			x = ZP0();
+			y = INC();
+			cycles = 5;
+			break;
+		case 231:
+			x = IMP();
+			y = XXX();
+			cycles = 5;
+			break;
+		case 232:
+			x = IMP();
+			y = INX();
+			cycles = 2;
+			break;
+		case 233:
+			x = IMM();
+			y = SBC();
+			cycles = 2;
+			break;
+		case 234:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+
+		case 235:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 236:
+			x = ABS();
+			y = CPX();
+			cycles = 4;
+			break;
+
+		case 237:
+			x = ABS();
+			y = SBC();
+			cycles = 4;
+			break;
+		case 238:
+			x = ABS();
+			y = INC();
+			cycles = 6;
+			break;
+		case 239:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 240:
+			x = REL();
+			y = BEQ();
+			cycles = 2;
+			break;
+		case 241:
+			x = IZY();
+			y = SBC();
+			cycles = 5;
+			break;
+		case 242:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 243:
+			x = IMP();
+			y = XXX();
+			cycles = 8;
+			break;
+		case 244:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 245:
+			x = ZPX();
+			y = SBC();
+			cycles = 4;
+			break;
+		case 246:
+			x = ZPX();
+			y = INC();
+			cycles = 6;
+			break;
+		case 247:
+			x = IMP();
+			y = XXX();
+			cycles = 6;
+			break;
+		case 248:
+			x = IMP();
+			y = SED();
+			cycles = 2;
+			break;
+		case 249:
+			x = ABY();
+			y = SBC();
+			cycles = 4;
+			break;
+		case 250:
+			x = IMP();
+			y = XXX();
+			cycles = 2;
+			break;
+		case 251:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		case 252:
+			x = IMP();
+			y = XXX();
+			cycles = 4;
+			break;
+		case 253:
+			x = ABX();
+			y = SBC();
+			cycles = 4;
+			break;
+		case 254:
+			x = ABX();
+			y = INC();
+			cycles = 7;
+			break;
+		case 255:
+			x = IMP();
+			y = XXX();
+			cycles = 7;
+			break;
+		}
+		cycles += (x & y);
 
 	}
 	cycles--;
 }
-// 
-uint8_t cpu::GetFlag(statusflagslist f)
+
+
+// resets the cpu
+// the program counter is read in two parts from $FFFC and $FFFD as they contain a secondary address for the program counter to jump to
+void cpu::reset() {
+	accumulator = 0;
+	xindex = 0;
+	yindex = 0;
+	sp = 0;
+	sr = 0 | srflagslist[5];
+
+	uint16_t lo = read(0xFFFC);
+	uint16_t hi = read(0xFFFD);
+
+	pc = (hi << 8) | lo;
+	addr_rel = 0;
+	addr_abs = 0;
+	fetched = 0;
+
+	cycles = 8;
+}
+
+// method to push to stack
+void cpu::pushtostack(uint8_t data) {
+	write(0x0100 + sp, data);
+	sp--;
+}
+// method to pop from stack
+uint8_t cpu::popfromstack() {
+	sp++;
+	auto data = read(0x0100 + sp);
+	return data;
+}
+
+// only happens when the interrupt disable flag is not set. to preserve the current state of the processor, the program counter is pushed to the stack as well as the current status register 
+// so that they can be restored by the RTI instruction when the interrupt is complete. the program counter is then set to a new fixed address which contains the typical routine for dealing with interrupts, starting at $FFFE
+void cpu::interrupt() {
+	if (GetStatusFlag('ID') == 0) {
+
+		pushtostack((pc >> 8) & 0x00FF);
+		pushtostack(pc & 0x00FF);
+
+		SetStatusFlag('B', 0);
+		SetStatusFlag('U', 1);
+		SetStatusFlag('ID', 1);
+		pushtostack(sr);
+		addr_abs = 0xFFFE;
+		uint16_t lo = read(addr_abs);
+		uint16_t hi = read(addr_abs + 1);
+		pc = (hi << 8) | lo;
+
+		cycles = 7;
+
+	}
+}
+
+// functions the same as a normal interrupt but will always occur, even if the interrupt disable flag is set. the routine for dealing with a non maskable interrupt is also held in $FFFA rather than $FFFE and it requires an extra cycle
+void cpu::nminterrupt() {
+
+	pushtostack((pc >> 8) & 0x00FF);
+	pushtostack(pc & 0x00FF);
+
+	SetStatusFlag('B', 0);
+	SetStatusFlag('U', 1);
+	SetStatusFlag('ID', 1);
+	pushtostack(sr);
+	addr_abs = 0xFFFA;
+	uint16_t lo = read(addr_abs);
+	uint16_t hi = read(addr_abs + 1);
+	pc = (hi << 8) | lo;
+
+	cycles = 8;
+
+
+}
+
+uint8_t cpu::GetStatusFlag(char f)
 {
 	/*
 	gets specific value of a bit in the status register, f being the flag that is to be checked.performing an AND operation on the status register and the flag will produce a byte where everything is 0
-	except the position of the flag if it is set. for example if you want to check if the zero flag is set, as it is the 2nd bit if it is set the status register will show 00000010, while f will be 
+	except the position of the flag if it is set. for example if you want to check if the zero flag is set, as it is the 2nd bit if it is set the status register will show 00000010, while f will be
 	00000010 as well. performing an AND operation between these two will produce 00000010 which is 2 in decimal and therefore greater than 0, so it will return 1, indicating that the zero flag is set.
-	on the other hand, if the carry flag is set while the zero flag is not, the status register will be 00000001 while f will be 00000010. an and operation of these will produce 00000000, which is not greater than 
+	on the other hand, if the carry flag is set while the zero flag is not, the status register will be 00000001 while f will be 00000010. an and operation of these will produce 00000000, which is not greater than
 	0, returning 0 accordingly to indicate that the zero flag is not set.
-	*/ 
-	if (sr & f > 0) {
-		return 1;
-	}
-	else {
-		return 0;
+	*/
+
+	auto func = [&](uint8_t flags) {
+		if ((sr & flags) > 0) return 1;
+		else return 0;
+	};
+
+	switch (f) {
+	case 'C':
+		return func(srflagslist[0]);
+		break;
+	case 'Z':
+		return func(srflagslist[1]);
+		break;
+	case 'ID':
+		return func(srflagslist[2]);
+		break;
+	case 'D':
+		return func(srflagslist[3]);
+		break;
+	case 'B':
+		return func(srflagslist[4]);
+		break;
+	case 'U':
+		return func(srflagslist[5]);
+		break;
+	case 'O':
+		return func(srflagslist[6]);
+		break;
+	case 'N':
+		return func(srflagslist[7]);
+		break;
 	}
 }
 
 /*
-sets a specific bit of the status register. v represents the value you want to set it to, true for 1, false for 0. therefore if the status register contained 
-00000010 and you wanted to clear the zero flag, f would be 00000010 and v would be false. so the status register and NOT f would be ANDed together, giving 
-00000010 & 11111101 which is 00000000. The new status register would then be 00000000 with the zero flag cleared.  
-*/ 
-void cpu::SetFlag(statusflagslist f, bool v)
+sets a specific bit of the status register. v represents the value you want to set it to, true for 1, false for 0. therefore if the status register contained
+00000010 and you wanted to clear the zero flag, f would be 00000010 and v would be false. so the status register and NOT f would be ANDed together, giving
+00000010 & 11111101 which is 00000000. The new status register would then be 00000000 with the zero flag cleared.
+*/
+void cpu::SetStatusFlag(char f, bool v)
 {
-	if (v)
-		sr = sr | f;
-	else
-		sr = sr & ~f;
+	auto func = [&](uint8_t flags) {
+		if (v) {
+			sr = sr | flags;
+		}
+		else sr = sr & ~flags;
+	};
+
+	switch (f) {
+	case 'C':
+		func(srflagslist[0]);
+		break;
+	case 'Z':
+		func(srflagslist[1]);
+		break;
+	case 'ID':
+		func(srflagslist[2]);
+		break;
+	case 'D':
+		func(srflagslist[3]);
+		break;
+	case 'B':
+		func(srflagslist[4]);
+		break;
+	case 'U':
+		func(srflagslist[5]);
+		break;
+	case 'O':
+		func(srflagslist[6]);
+		break;
+	case 'N':
+		func(srflagslist[7]);
+		break;
+	}
 }
 
 //addressing modes 
@@ -177,7 +1590,7 @@ uint8_t cpu::IND() {
 	{
 		addr_abs = (read(ptr & 0xFF00) << 8) | read(ptr);
 	}
-	else 
+	else
 	{
 		addr_abs = (read(ptr + 1) << 8) | read(ptr);
 	}
@@ -189,8 +1602,8 @@ uint8_t cpu::IZX() {
 	uint16_t t = read(pc);
 	pc++;
 
-	uint16_t lo = read((uint16_t)(t + (uint16_t)xindex) & 0x00FF);
-	uint16_t hi = read((uint16_t)(t + (uint16_t)xindex + 1) & 0x00FF);
+	uint16_t lo = read((t + xindex) & 0x00FF);
+	uint16_t hi = read((t + xindex + 1) & 0x00FF);
 
 	addr_abs = (hi << 8) | lo;
 
@@ -224,166 +1637,51 @@ uint8_t cpu::REL()
 	return 0;
 }
 
-
-// resets the cpu, self-explanatory. the absolute address is set to 0xFFFC as it contains a secondary address for the program counter to jump to. the programmer would usually set this address themselves
-void cpu::reset() {
-	accumulator = 0;
-	xindex = 0;
-	yindex = 0;
-	sp = 0;
-	sr = 0x00 | U;
-
-	addr_abs = 0xFFFC;
-	uint16_t lo = read(addr_abs + 0);
-	uint16_t hi = read(addr_abs + 1);
-
-	pc = (hi << 8) | lo;
-	addr_rel = 0x0000;
-	addr_abs = 0x0000;
-	fetched = 0x00;
-
-	cycles = 8; 
-}
-// only happens when the interrupt disable flag is not set. to preserve the current state of the processor, the program counter is pushed to the stack as well as the current status register 
-// so that they can be restored by the RTI instruction when the interrupt is complete. the program counter is then set to a new fixed address which contains the typical routine for dealing with interrupts, starting at $FFFE
-void cpu::interrupt() {
-	if (GetFlag(ID) == 0) {
-
-		pushtostack((pc >> 8) & 0x00FF);
-		pushtostack(pc & 0x00FF);
-
-		SetFlag(B, 0);
-		SetFlag(U, 1);
-		SetFlag(ID, 1);
-		pushtostack(sr);
-		addr_abs = 0xFFFE;
-		uint16_t lo = read(addr_abs);
-		uint16_t hi = read(addr_abs + 1);
-		pc = (hi << 8) | lo;
-
-		cycles = 7;
-
-	}
-}
-// functions the same as a normal interrupt but will always occur, even if the interrupt disable flag is set. the routine for dealing with a non maskable interrupt is also held in $FFFA rather than $FFFE and it requires an extra cycle
-void cpu::nminterrupt() {
-
-		pushtostack((pc >> 8) & 0x00FF);
-		pushtostack(pc & 0x00FF);
-
-		SetFlag(B, 0);
-		SetFlag(U, 1);
-		SetFlag(ID, 1);
-		pushtostack(sr);
-		addr_abs = 0xFFFA;
-		uint16_t lo = read(addr_abs);
-		uint16_t hi = read(addr_abs + 1);
-		pc = (hi << 8) | lo;
-
-		cycles = 8;
-
-
-}
-// method to push to stack
-void cpu::pushtostack(uint8_t data) {
-	write(0x0100 + sp, data);
-	sp--;
-}
-// method to pop from stack
-uint8_t cpu::popfromstack() {
-	sp++;
-	auto data = read(0x0100 + sp); 
-	return data;
-}
-
-
 // instructions
 
 // fetches data from the absolute address in ram 
 uint8_t cpu::fetch() {
-	if (lookup[opcode].addressingmode != &cpu::IMP) {
+	if (!implied(opcode)) {
 		fetched = read(addr_abs);
 	}
 	return fetched;
 }
+
+// add memory to accumulator with carry
+// overflow can occur when two positive numbers are added and the result is a negative number, or when two negative numbers are added and the result is a positive number. aka overflow occurs when the sign of the parameters and result is different
+// XOR'ing the accumulator with the fetched data returns 0x80 if their signs are different because the first bit is the sign bit. NOT this operation so that you get 0x80 if they have the same sign. 
+// Do the same with the accumulator and the sum of the three variables, then AND these two results together. This will have the effect of returning 1 if the accumulator and the fetched data have the same sign, and the 
+// accumulator and summation of the accumulator, fetched data and the carry flag have a different sign. 
+// https://stackoverflow.com/questions/29193303/6502-emulation-proper-way-to-implement-adc-and-sbc
+uint8_t cpu::ADC() {
+	fetch();
+	auto temp = accumulator + fetched + GetStatusFlag('C');
+	SetStatusFlag('C', temp > 255);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x80);
+	SetStatusFlag('O', (~(accumulator ^ fetched) & (accumulator ^ temp)) & 0x80);
+	accumulator = temp & 0x00FF;
+	return 1;
+}
+
 // AND fetched data with accumulator. requires an extra cycle if a page boundary is crossed
 uint8_t cpu::AND() {
 	fetch();
 	accumulator = accumulator & fetched;
-	SetFlag(Z, accumulator == 0x00);
-	SetFlag(N, accumulator & 0x80);
+	SetStatusFlag('Z', accumulator == 0);
+	SetStatusFlag('N', accumulator & 0x80);
 	return 1;
-}
-// clears carry flag 
-uint8_t cpu::CLC() {
-	SetFlag(C, false);
-	return 0;
-}
-// add memory to accumulator with carry. must therefore have a variable which holds the sum of the accumulator, the fetched data and the status register containing the carry flag. 
-// if the result is greater than 255 the carry bit is set as the maximum addressable range is 2^n-1 where n = 8 which is 255. however the 6502 has support for signed bits so overflow may occur in 
-// certain circumstances. in this case, the overflow flag must be set, where O <- ~(A^M) & A^(A+M+C). This can be proven by a truth table holding the sign bit of each variable. 
-// A  M  R | O | A^R | A^M |~(A^M) | 
-// 0  0  0 | 0 |  0  |  0  |   1   |
-// 0  0  1 | 1 |  1  |  0  |   1   |
-// 0  1  0 | 0 |  0  |  1  |   0   |
-// 0  1  1 | 0 |  1  |  1  |   0   |  so O = ~(A^M) & (A^R)
-// 1  0  0 | 0 |  1  |  1  |   0   |
-// 1  0  1 | 0 |  0  |  1  |   0   |
-// 1  1  0 | 1 |  1  |  0  |   1   |
-// 1  1  1 | 0 |  0  |  0  |   1   |
-// Positive Number + Positive Number = Negative Result -> Overflow
-// Negative Number + Negative Number = Positive Result -> Overflow
-// Positive Number + Negative Number = Either Result -> No Overflow
-// Positive Number + Positive Number = Positive Result -> No Overflow
-// Negative Number + Negative Number = Negative Result -> No Overflow
-// extra clock cycle may be required
-uint8_t cpu::ADC() {
-	fetch();
-	auto temp = (uint16_t)accumulator + (uint16_t)fetched + (uint16_t)GetFlag(C);
-	SetFlag(C, temp > 255);
-	SetFlag(Z, (temp & 0x00FF) == 0);
-	SetFlag(N, temp & 0x80);
-	SetFlag(O, (~((uint16_t)accumulator ^ (uint16_t)fetched) & ((uint16_t)accumulator ^ (uint16_t)temp)) & 0x0080);
-	accumulator = temp & 0x00FF;
-	return 1;
-}
-// subtraction uses a similar thing to addition, but as the 6502 only contains a half adder there is no way to directly subtract one value from another. the second value must therefore be converted 
-// into its negative counterpart and then added to the first. this is done using the XOR operation as it essentially performs twos complement. 
-uint8_t cpu::SBC() {
-	fetch();
-	uint16_t value = ((uint16_t)fetched ^ 0000000011111111);
-	auto temp = (uint16_t)accumulator + value + (uint16_t)GetFlag(C);
-	SetFlag(C, temp & 0xFF00);
-	SetFlag(Z, (temp & 0x00FF) == 0);
-	SetFlag(N, temp & 0x0080);
-	SetFlag(O, (temp ^ (uint16_t)accumulator) & (temp ^ value) & 0x0080);
-	accumulator = temp & 0x00FF;
-	return 1;
-
-}
-// restores cpu state to how it was before an interrupt occured, taking the status register and program counter from the stack 
-uint8_t cpu::RTI() {
-	sr = popfromstack();
-	// clear B and unused flags
-	sr = sr & ~B;
-	sr = sr & ~U;
-
-	sp++;
-	pc = (uint16_t)read(0x0100 + sp);
-	sp++;
-	pc = pc | (uint16_t)read(0x0100 + sp) << 8;
-	return 0;
 }
 
 // left shift operation
 uint8_t cpu::ASL() {
 	fetch();
-	auto temp = (uint16_t)fetched << 1;
-	SetFlag(C, (temp & 0xFF00) > 0);
-	SetFlag(N, (temp & 0x800));
-	SetFlag(Z, (temp & 0x00FF) == 0x00);
+	auto temp = fetched << 1;
+	SetStatusFlag('C', (temp & 0xFF00) > 0);
+	SetStatusFlag('N', (temp & 0x80));
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
 	// if implied addressing there is no address to write to, so the accumulator holds the result of the operation
-	if (lookup[opcode].addressingmode == &cpu::IMP) {
+	if (implied(opcode)) {
 		accumulator = temp & 0x00FF;
 	}
 	else {
@@ -391,9 +1689,11 @@ uint8_t cpu::ASL() {
 	}
 	return 0;
 }
+
+
 // branch if the carry bit is clear so that pc = address. at least 1 additional clock cycle will always be required, 2 if a page boundary is crossed
 uint8_t cpu::BCC() {
-	if (GetFlag(C) == 0) {
+	if (GetStatusFlag('C') == 0) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -405,7 +1705,7 @@ uint8_t cpu::BCC() {
 }
 // branch if the carry bit is set
 uint8_t cpu::BCS() {
-	if (GetFlag(C) == 1) {
+	if (GetStatusFlag('C') == 1) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -417,28 +1717,28 @@ uint8_t cpu::BCS() {
 }
 // branch if the zero flag is set
 uint8_t cpu::BEQ() {
-		if (GetFlag(Z) == 1) {
+	if (GetStatusFlag('Z') == 1) {
+		cycles++;
+		addr_abs = pc + addr_rel;
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
 			cycles++;
-			addr_abs = pc + addr_rel;
-			if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
-				cycles++;
-			}
-			pc = addr_abs;
 		}
-		return 0;
+		pc = addr_abs;
+	}
+	return 0;
 }
 // test bits in memory with accumulator. bits 7 and 6 of operand are transferred to bit 7 and 6 of status register (N,O). the zero flag is set to the result of operand AND accumulator
 uint8_t cpu::BIT() {
 	fetch();
 	auto temp = accumulator & fetched;
-	SetFlag(Z, (temp & 0x00FF) == 0x00);
-	SetFlag(N, fetched & (1 << 7));
-	SetFlag(O, fetched & (1 << 6));
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', fetched & (1 << 7));
+	SetStatusFlag('O', fetched & (1 << 6));
 	return 0;
 }
 // branch if negative flag set
 uint8_t cpu::BMI() {
-	if (GetFlag(N) == 1) {
+	if (GetStatusFlag('N') == 1) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -450,7 +1750,7 @@ uint8_t cpu::BMI() {
 }
 // branch if zero flag not set
 uint8_t cpu::BNE() {
-	if (GetFlag(Z) == 0) {
+	if (GetStatusFlag('Z') == 0) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -462,7 +1762,7 @@ uint8_t cpu::BNE() {
 }
 // branch if negative flag not set
 uint8_t cpu::BPL() {
-	if (GetFlag(N) == 0) {
+	if (GetStatusFlag('N') == 0) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -476,20 +1776,20 @@ uint8_t cpu::BPL() {
 uint8_t cpu::BRK() {
 	pc++;
 
-	SetFlag(ID, 1);
+	SetStatusFlag('ID', 1);
 	pushtostack((pc >> 8) & 0x00FF);
 	pushtostack(pc & 0x00FF);
 
-	SetFlag(B, 1);
+	SetStatusFlag('B', 1);
 	pushtostack(sr);
-	SetFlag(B, 0);
+	SetStatusFlag('B', 0);
 
-	pc = (uint16_t)read(0xFFFE) | ((uint16_t)read(0xFFFF) << 8);
+	pc = read(0xFFFE) | (read(0xFFFF) << 8);
 	return 0;
 }
 // branch if overflow flag clear
 uint8_t cpu::BVC() {
-	if (GetFlag(O) == 0) {
+	if (GetStatusFlag('O') == 0) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -501,7 +1801,7 @@ uint8_t cpu::BVC() {
 }
 // branch if overflow flag set 
 uint8_t cpu::BVS() {
-	if (GetFlag(O) == 1) {
+	if (GetStatusFlag('O') == 1) {
 		cycles++;
 		addr_abs = pc + addr_rel;
 		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
@@ -511,99 +1811,119 @@ uint8_t cpu::BVS() {
 	}
 	return 0;
 }
+
+// clears carry flag 
+uint8_t cpu::CLC() {
+	SetStatusFlag('C', false);
+	return 0;
+}
+
 // clear decimal flag
 uint8_t cpu::CLD() {
-	SetFlag(D, false);
+	SetStatusFlag('D', false);
 	return 0;
 }
 // clear interrupt disable flag
 uint8_t cpu::CLI() {
-	SetFlag(ID, false);
+	SetStatusFlag('ID', false);
 	return 0;
 }
+
 // clear overflow flag
 uint8_t cpu::CLV() {
-	SetFlag(O, false);
+	SetStatusFlag('O', false);
 	return 0;
 }
+
 // compare memory with accumulator
-uint8_t cpu::CMP() {
+uint8_t cpu::CMP()
+{
 	fetch();
-	auto temp = (uint16_t)accumulator - (uint16_t)fetched;
-	SetFlag(C, (accumulator >= fetched));
-	SetFlag(N, (temp & 0x0080));
-	SetFlag(Z, (temp & 0x00FF) == 0x0080);
+	auto temp = accumulator - fetched;
+	SetStatusFlag('C', accumulator >= fetched);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
 	return 1;
 }
+
+
 // compare memory with x register
-uint8_t cpu::CPX() {
+uint8_t cpu::CPX()
+{
 	fetch();
-	auto temp = (uint16_t)xindex - (uint16_t)fetched;
-	SetFlag(C, (xindex >= fetched));
-	SetFlag(N, (temp & 0x0080));
-	SetFlag(Z, (temp & 0x00FF) == 0x0080);
-	return 1;
+	auto temp = xindex - fetched;
+	SetStatusFlag('C', xindex >= fetched);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
+	return 0;
 }
+
+
 // compare memory with y register
-uint8_t cpu::CPY() {
+uint8_t cpu::CPY()
+{
 	fetch();
-	auto temp = (uint16_t)yindex - (uint16_t)fetched;
-	SetFlag(C, (yindex >= fetched));
-	SetFlag(N, (temp & 0x0080));
-	SetFlag(Z, (temp & 0x00FF) == 0x0080);
-	return 1;
+	auto temp = yindex - fetched;
+	SetStatusFlag('C', yindex >= fetched);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
+	return 0;
 }
+
+
 // decrement memory by one
 uint8_t cpu::DEC() {
 	fetch();
-	write(addr_abs, fetched - 1);
-	SetFlag(N, (fetched - 1) & 0x80);
-	SetFlag(Z, (fetched - 1) == 0x00);
+	auto temp = fetched - 1;
+	write(addr_abs, temp & 0x00FF);
+	SetStatusFlag('N', temp & 0x80);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
 	return 0;
 }
 // decrement x reg by 1
 uint8_t cpu::DEX() {
 	xindex -= 1;
-	SetFlag(N, xindex & 0x80);
-	SetFlag(Z, xindex == 0x00);
+	SetStatusFlag('N', xindex & 0x80);
+	SetStatusFlag('Z', xindex == 0);
 	return 0;
 }
 // decrement y reg by 1
 uint8_t cpu::DEY() {
-	yindex -= 1;
-	SetFlag(N, yindex & 0x80);
-	SetFlag(Z, yindex == 0x00);
+	yindex--;
+	SetStatusFlag('N', yindex & 0x80);
+	SetStatusFlag('Z', yindex == 0);
 	return 0;
 }
 // XOR memory with accumulator
 uint8_t cpu::EOR() {
 	fetch();
 	auto temp = (fetched | accumulator) & (~(fetched & accumulator));
-	SetFlag(N, temp & 0x80);
-	SetFlag(Z, temp == 0x00);
 	accumulator = temp;
+	SetStatusFlag('N', accumulator & 0x80);
+	SetStatusFlag('Z', accumulator == 0);
 	return 1;
 }
 // increment memory by one
 uint8_t cpu::INC() {
 	fetch();
-	write(addr_abs, fetched + 1);
-	SetFlag(N, (fetched + 1) & 0x80);
-	SetFlag(Z, (fetched + 1) == 0x00);
+	auto temp = fetched + 1;
+	write(addr_abs, temp & 0x00FF);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
 	return 0;
 }
 // increment x reg by one
 uint8_t cpu::INX() {
 	xindex++;
-	SetFlag(N, xindex & 0x80);
-	SetFlag(Z, xindex == 0x00);
+	SetStatusFlag('N', xindex & 0x80);
+	SetStatusFlag('Z', xindex == 0);
 	return 0;
 }
 // increment y reg by one
 uint8_t cpu::INY() {
 	yindex++;
-	SetFlag(N, yindex & 0x80);
-	SetFlag(Z, yindex == 0x00);
+	SetStatusFlag('N', yindex & 0x80);
+	SetStatusFlag('Z', yindex == 0);
 	return 0;
 }
 // jump to new address
@@ -622,13 +1942,15 @@ uint8_t cpu::JSR() {
 	pc = addr_abs;
 	return 0;
 }
+
+
 // load accumulator with memory
 uint8_t cpu::LDA() {
 
 	fetch();
 	accumulator = fetched;
-	SetFlag(N, fetched & 0x80);
-	SetFlag(Z, fetched == 0x00);
+	SetStatusFlag('N', accumulator & 0x80);
+	SetStatusFlag('Z', accumulator == 0);
 	return 1;
 
 }
@@ -637,8 +1959,8 @@ uint8_t cpu::LDX() {
 
 	fetch();
 	xindex = fetched;
-	SetFlag(N, fetched & 0x80);
-	SetFlag(Z, fetched == 0x00);
+	SetStatusFlag('N', xindex & 0x80);
+	SetStatusFlag('Z', xindex == 0);
 	return 1;
 
 }
@@ -647,19 +1969,19 @@ uint8_t cpu::LDY() {
 
 	fetch();
 	yindex = fetched;
-	SetFlag(N, fetched & 0x80);
-	SetFlag(Z, fetched == 0x00);
+	SetStatusFlag('N', fetched & 0x80);
+	SetStatusFlag('Z', fetched == 0);
 	return 1;
 
 }
 // shift right 
 uint8_t cpu::LSR() {
 	fetch();
-	SetFlag(C, fetched & 0x0001);
+	SetStatusFlag('C', fetched & 0x0001);
 	auto temp = fetched >> 1;
-	SetFlag(Z, (temp & 0x00FF) == 0x0000);
-	SetFlag(N, false);
-	if (lookup[opcode].addressingmode == &cpu::IMP)
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', false);
+	if (implied(opcode))
 		accumulator = temp & 0x00FF;
 	else
 		write(addr_abs, temp & 0x00FF);
@@ -673,8 +1995,8 @@ uint8_t cpu::NOP() {
 uint8_t cpu::ORA() {
 	fetch();
 	auto temp = fetched | accumulator;
-	SetFlag(N, (temp & 0x80));
-	SetFlag(Z, (temp == 0x00));
+	SetStatusFlag('N', (temp & 0x80));
+	SetStatusFlag('Z', (temp == 0));
 	accumulator = temp;
 	return 1;
 }
@@ -683,18 +2005,22 @@ uint8_t cpu::PHA() {
 	pushtostack(accumulator);
 	return 0;
 }
+
+
 // push processor status on to stack with break flag and unused flag set to 1 
 uint8_t cpu::PHP() {
-	SetFlag(B, true);
-	SetFlag(U, true);
+	SetStatusFlag('B', true);
+	SetStatusFlag('U', true);
 	pushtostack(sr);
 	return 0;
 }
+
+
 // pop accumulator from stack
 uint8_t cpu::PLA() {
 	accumulator = popfromstack();
-	SetFlag(N, accumulator & 0x80);
-	SetFlag(Z, accumulator == 0x00);
+	SetStatusFlag('N', accumulator & 0x80);
+	SetStatusFlag('Z', accumulator == 0);
 	return 0;
 }
 // pop status register from stack 
@@ -702,55 +2028,89 @@ uint8_t cpu::PLP() {
 	sr = popfromstack();
 	return 0;
 }
+
 // rotate one bit left. this means the left most bit will go to the front of the binary number
 uint8_t cpu::ROL() {
 	fetch();
-	auto temp = (uint16_t)fetched << 1 | GetFlag(C);
-	SetFlag(C, temp & 0xFF00);
-	SetFlag(Z, (temp & 0x00FF) == 0x0000);
-	SetFlag(N, temp & 0x0080);
-	if (lookup[opcode].addressingmode == &cpu::IMP) {
+	auto temp = fetched << 1 | GetStatusFlag('C');
+	SetStatusFlag('C', temp & 0xFF00);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
+	if (implied(opcode)) {
 		accumulator = temp & 0x00FF;
 	}
 	else {
 		write(addr_abs, temp & 0x00FF);
 	}
 	return 0;
-	
+
 }
+
+// restores cpu state to how it was before an interrupt occured, taking the status register and program counter from the stack 
+uint8_t cpu::RTI() {
+	sr = popfromstack();
+	// clear B and unused flags
+	sr = sr & ~srflagslist[4];
+	sr = sr & ~srflagslist[5];
+
+	sp++;
+	pc = read(0x0100 + sp);
+	sp++;
+	pc = pc | read(0x0100 + sp) << 8;
+	return 0;
+}
+
+
 // rotate one bit right 
 uint8_t cpu::ROR() {
 	fetch();
-	auto temp = (uint16_t)(GetFlag(C) << 7) | (fetched >> 1);
-	SetFlag(C, fetched & 0x01);
-	SetFlag(Z, (temp & 0x00FF) == 0x00);
-	SetFlag(N, temp & 0x0080);
-	if (lookup[opcode].addressingmode == &cpu::IMP)
+	auto temp = (GetStatusFlag('C') << 7) | (fetched >> 1);
+	SetStatusFlag('C', fetched & 0x01);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
+	if (implied(opcode))
 		accumulator = temp & 0x00FF;
 	else
 		write(addr_abs, temp & 0x00FF);
 	return 0;
 }
 // return from subroutine
-uint8_t cpu::RTS() {
+uint8_t cpu::RTS()
+{
 	auto temp = popfromstack();
-	temp++;
-	pc = temp;
+	auto temp2 = (popfromstack()) << 8;
+	pc = temp | temp2;
+	pc++;
 	return 0;
 }
+
+// subtraction with carry, basically the inverse of the ADC instruction
+uint8_t cpu::SBC() {
+	fetch();
+	auto value = (fetched ^ 0x00FF);
+	auto temp = accumulator + value + GetStatusFlag('C');
+	SetStatusFlag('C', temp & 0xFF00);
+	SetStatusFlag('Z', (temp & 0x00FF) == 0);
+	SetStatusFlag('N', temp & 0x0080);
+	SetStatusFlag('O', (temp ^ accumulator) & (temp ^ value) & 0x80);
+	accumulator = temp & 0x00FF;
+	return 1;
+
+}
+
 // set carry flag 
 uint8_t cpu::SEC() {
-	SetFlag(C, true);
+	SetStatusFlag('C', true);
 	return 0;
 }
 // set decimal flag
 uint8_t cpu::SED() {
-	SetFlag(D, true);
+	SetStatusFlag('D', true);
 	return 0;
 }
 // set interrupt disable flag
 uint8_t cpu::SEI() {
-	SetFlag(ID, true);
+	SetStatusFlag('ID', true);
 	return 0;
 }
 // store accumulator in memory
@@ -771,29 +2131,29 @@ uint8_t cpu::STY() {
 // transfer accumulator to x register
 uint8_t cpu::TAX() {
 	xindex = accumulator;
-	SetFlag(N, xindex & 0x80);
-	SetFlag(Z, xindex == 0x00);
+	SetStatusFlag('N', xindex & 0x80);
+	SetStatusFlag('Z', xindex == 0);
 	return 0;
 }
 // transfer accumulator to y register
 uint8_t cpu::TAY() {
 	yindex = accumulator;
-	SetFlag(N, yindex & 0x80);
-	SetFlag(Z, yindex == 0x00);
+	SetStatusFlag('N', yindex & 0x80);
+	SetStatusFlag('Z', yindex == 0);
 	return 0;
 }
 // transfer stack pointer to x register
 uint8_t cpu::TSX() {
 	xindex = sp;
-	SetFlag(N, yindex & 0x80);
-	SetFlag(Z, yindex == 0x00);
+	SetStatusFlag('N', yindex & 0x80);
+	SetStatusFlag('Z', yindex == 0);
 	return 0;
 }
 // transfer accumulator to x register
 uint8_t cpu::TXA() {
 	accumulator = xindex;
-	SetFlag(N, accumulator & 0x80);
-	SetFlag(Z, accumulator == 0x00);
+	SetStatusFlag('N', accumulator & 0x80);
+	SetStatusFlag('Z', accumulator == 0);
 	return 0;
 }
 // transfer x register to stack pointer
@@ -804,8 +2164,8 @@ uint8_t cpu::TXS() {
 // transfer y register to accumulator
 uint8_t cpu::TYA() {
 	accumulator = yindex;
-	SetFlag(N, accumulator & 0x80);
-	SetFlag(Z, accumulator == 0x00);
+	SetStatusFlag('N', accumulator & 0x80);
+	SetStatusFlag('Z', accumulator == 0);
 	return 0;
 }
 // catches all illegal opcodes
@@ -819,105 +2179,4 @@ bool cpu::complete()
 	if (cycles == 0) return true;
 	else return false;
 }
-
-// this function is copy and pasted as i have no clue how to perform disassembly 
-std::map<uint16_t, std::string> cpu::disassemble(uint16_t nStart, uint16_t nStop)
-{
-	uint32_t addr = nStart;
-	uint8_t value = 0x00, lo = 0x00, hi = 0x00;
-	std::map<uint16_t, std::string> mapLines;
-	uint16_t line_addr = 0;
-
-	auto hex = [](uint32_t n, uint8_t d)
-	{
-		std::string s(d, '0');
-		for (int i = d - 1; i >= 0; i--, n >>= 4)
-			s[i] = "0123456789ABCDEF"[n & 0xF];
-		return s;
-	};
-
-	while (addr <= (uint32_t)nStop)
-	{
-		line_addr = addr;
-
-		std::string sInst = "$" + hex(addr, 4) + ": ";
-
-		uint8_t opcode = bus->read(addr, true); addr++;
-		sInst += lookup[opcode].name + " ";
-
-		if (lookup[opcode].addressingmode == &cpu::IMP)
-		{
-			sInst += " {IMP}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::IMM)
-		{
-			value = bus->read(addr, true); addr++;
-			sInst += "#$" + hex(value, 2) + " {IMM}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::ZP0)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = 0x00;
-			sInst += "$" + hex(lo, 2) + " {ZP0}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::ZPX)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = 0x00;
-			sInst += "$" + hex(lo, 2) + ", X {ZPX}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::ZPY)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = 0x00;
-			sInst += "$" + hex(lo, 2) + ", Y {ZPY}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::IZX)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = 0x00;
-			sInst += "($" + hex(lo, 2) + ", X) {IZX}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::IZY)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = 0x00;
-			sInst += "($" + hex(lo, 2) + "), Y {IZY}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::ABS)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = bus->read(addr, true); addr++;
-			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + " {ABS}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::ABX)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = bus->read(addr, true); addr++;
-			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", X {ABX}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::ABY)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = bus->read(addr, true); addr++;
-			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", Y {ABY}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::IND)
-		{
-			lo = bus->read(addr, true); addr++;
-			hi = bus->read(addr, true); addr++;
-			sInst += "($" + hex((uint16_t)(hi << 8) | lo, 4) + ") {IND}";
-		}
-		else if (lookup[opcode].addressingmode == &cpu::REL)
-		{
-			value = bus->read(addr, true); addr++;
-			sInst += "$" + hex(value, 2) + " [$" + hex(addr + (int8_t)value, 4) + "] {REL}";
-		}
-
-		mapLines[line_addr] = sInst;
-	}
-
-	return mapLines;
-}
-
 

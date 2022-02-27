@@ -1,209 +1,3 @@
-﻿/*
-	olcPixelGameEngine.h
-
-	+-------------------------------------------------------------+
-	|           OneLoneCoder Pixel Game Engine v2.07              |
-	|  "What do you need? Pixels... Lots of Pixels..." - javidx9  |
-	+-------------------------------------------------------------+
-
-	What is this?
-	~~~~~~~~~~~~~
-	olc::PixelGameEngine is a single file, cross platform graphics and userinput
-	framework used for games, visualisations, algorithm exploration and learning.
-	It was developed by YouTuber "javidx9" as an assistive tool for many of his
-	videos. The goal of this project is to provide high speed graphics with
-	minimal project setup complexity, to encourage new programmers, younger people,
-	and anyone else that wants to make fun things.
-
-	However, olc::PixelGameEngine is not a toy! It is a powerful and fast utility
-	capable of delivering high resolution, high speed, high quality applications
-	which behave the same way regardless of the operating system or platform.
-
-	This file provides the core utility set of the olc::PixelGameEngine, including
-	window creation, keyboard/mouse input, main game thread, timing, pixel drawing
-	routines, image/sprite loading and drawing routines, and a bunch of utility
-	types to make rapid development of games/visualisations possible.
-
-
-	License (OLC-3)
-	~~~~~~~~~~~~~~~
-
-	Copyright 2018 - 2020 OneLoneCoder.com
-
-	Redistribution and use in source and binary forms, with or without modification,
-	are permitted provided that the following conditions are met:
-
-	1. Redistributions or derivations of source code must retain the above copyright
-	notice, this list of conditions and the following disclaimer.
-
-	2. Redistributions or derivative works in binary form must reproduce the above
-	copyright notice. This list of conditions and the following	disclaimer must be
-	reproduced in the documentation and/or other materials provided with the distribution.
-
-	3. Neither the name of the copyright holder nor the names of its contributors may
-	be used to endorse or promote products derived from this software without specific
-	prior written permission.
-
-	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS	"AS IS" AND ANY
-	EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-	OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
-	SHALL THE COPYRIGHT	HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-	INCIDENTAL,	SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-	TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-	BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-	CONTRACT, STRICT LIABILITY, OR TORT	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-	ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-	SUCH DAMAGE.
-
-	Links
-	~~~~~
-	YouTube:	https://www.youtube.com/javidx9
-				https://www.youtube.com/javidx9extra
-	Discord:	https://discord.gg/WhwHUMV
-	Twitter:	https://www.twitter.com/javidx9
-	Twitch:		https://www.twitch.tv/javidx9
-	GitHub:		https://www.github.com/onelonecoder
-	Homepage:	https://www.onelonecoder.com
-	Patreon:	https://www.patreon.com/javidx9
-	Community:  https://community.onelonecoder.com
-
-	Compiling in Linux
-	~~~~~~~~~~~~~~~~~~
-	You will need a modern C++ compiler, so update yours!
-	To compile use the command:
-
-	g++ -o YourProgName YourSource.cpp -lX11 -lGL -lpthread -lpng -lstdc++fs -std=c++17
-
-	On some Linux configurations, the frame rate is locked to the refresh
-	rate of the monitor. This engine tries to unlock it but may not be
-	able to, in which case try launching your program like this:
-
-	vblank_mode=0 ./YourProgName
-
-
-	Compiling in Code::Blocks on Windows
-	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	Well I wont judge you, but make sure your Code::Blocks installation
-	is really up to date - you may even consider updating your C++ toolchain
-	to use MinGW32-W64.
-
-	Guide for installing recent GCC for Windows:
-	https://www.msys2.org/
-	Guide for configuring code::blocks:
-	https://solarianprogrammer.com/2019/11/05/install-gcc-windows/
-	https://solarianprogrammer.com/2019/11/16/install-codeblocks-gcc-windows-build-c-cpp-fortran-programs/
-
-	Add these libraries to "Linker Options":
-	user32 gdi32 opengl32 gdiplus Shlwapi stdc++fs
-
-	Set these compiler options: -std=c++17
-
-	Ports
-	~~~~~
-	olc::PixelGameEngine has been ported and tested with varying degrees of
-	success to: WinXP, Win7, Win8, Win10, Various Linux, Raspberry Pi,
-	Chromebook, Playstation Portable (PSP) and Nintendo Switch. If you are
-	interested in the details of these ports, come and visit the Discord!
-
-	Thanks
-	~~~~~~
-	I'd like to extend thanks to Eremiell, slavka, gurkanctn, Phantim, IProgramInCPP
-	JackOJC, KrossX, Huhlig, Dragoneye, Appa, JustinRichardsMusic, SliceNDice, dandistine
-	Ralakus, Gorbit99, raoul, joshinils, benedani, Moros1138, Alexio, SaladinAkara & MagetzUb
-	for advice, ideas and testing, and I'd like to extend my appreciation to the
-	174K YouTube followers,	70+ Patreons and 8K Discord server members who give me
-	the motivation to keep going with all this :D
-
-	Significant Contributors: @Moros1138, @SaladinAkara, @MaGetzUb, @slavka, @Dragoneye & @Gorbit99
-
-	Special thanks to those who bring gifts!
-	GnarGnarHead.......Domina
-	Gorbit99...........Bastion, Ori & The Blind Forest, Terraria
-	Marti Morta........Gris
-	Danicron...........Terraria
-	SaladinAkara.......Aseprite
-	AlterEgo...........Final Fantasy XII - The Zodiac Age
-
-	Special thanks to my Patreons too - I wont name you on here, but I've
-	certainly enjoyed my tea and flapjacks :D
-
-	Author
-	~~~~~~
-	David Barr, aka javidx9, ｩOneLoneCoder 2018, 2019, 2020
-
-	2.01: Made renderer and platform static for multifile projects
-	2.02: Added Decal destructor, optimised Pixel constructor
-	2.03: Added FreeBSD flags, Added DrawStringDecal()
-	2.04: Windows Full-Screen bug fixed
-	2.05: +DrawPartialWarpedDecal() - draws a warped decal from a subset image
-		  +DrawPartialRotatedDecal() - draws a rotated decal from a subset image
-	2.06: +GetTextSize() - returns area occupied by multiline string
-		  +GetWindowSize() - returns actual window size
-		  +GetElapsedTime() - returns last calculated fElapsedTime
-		  +GetWindowMouse() - returns actual mouse location in window
-		  +DrawExplicitDecal() - bow-chikka-bow-bow
-		  +DrawPartialDecal(pos, size) - draws a partial decal to specified area
-		  +FillRectDecal() - draws a flat shaded rectangle as a decal
-		  +GradientFillRectDecal() - draws a rectangle, with unique colour corners
-		  +Modified DrawCircle() & FillCircle() - Thanks IanM-Matrix1 (#PR121)
-		  +Gone someway to appeasing pedants
-	2.07: +GetPixelSize() - returns user specified pixel size
-		  +GetScreenPixelSize() - returns actual size in monitor pixels
-		  +Pixel Cohesion Mode (flag in Construct()) - disallows arbitrary window scaling
-		  +Working VSYNC in Windows windowed application - now much smoother
-		  +Added string conversion for olc::vectors
-		  +Added comparator operators for olc::vectors
-		  +Added DestroyWindow() on windows platforms for serial PGE launches
-		  +Added GetMousePos() to stop TarriestPython whinging
-*/
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-
-// O------------------------------------------------------------------------------O
-// | Example "Hello World" Program (main.cpp)                                     |
-// O------------------------------------------------------------------------------O
-/*
-
-#define OLC_PGE_APPLICATION
-#include "olcPixelGameEngine.h"
-
-// Override base class with your custom functionality
-class Example : public olc::PixelGameEngine
-{
-public:
-	Example()
-	{
-		// Name you application
-		sAppName = "Example";
-	}
-
-public:
-	bool OnUserCreate() override
-	{
-		// Called once at the start, so create things here
-		return true;
-	}
-
-	bool OnUserUpdate(float fElapsedTime) override
-	{
-		// called once per frame, draws random coloured pixels
-		for (int x = 0; x < ScreenWidth(); x++)
-			for (int y = 0; y < ScreenHeight(); y++)
-				Draw(x, y, olc::Pixel(rand() % 256, rand() % 256, rand()% 256));
-		return true;
-	}
-};
-
-int main()
-{
-	Example demo;
-	if (demo.Construct(256, 240, 4, 4))
-		demo.Start();
-	return 0;
-}
-
-*/
 
 #ifndef OLC_PGE_DEF
 #define OLC_PGE_DEF
@@ -271,7 +65,7 @@ namespace _gfs = std::filesystem;
 #endif
 
 // O------------------------------------------------------------------------------O
-// | olcPixelGameEngine INTERFACE DECLARATION                                     |
+// | gameEngine INTERFACE DECLARATION                                     |
 // O------------------------------------------------------------------------------O
 namespace olc
 {
@@ -860,17 +654,17 @@ namespace olc
 	Object Oriented Mode
 	~~~~~~~~~~~~~~~~~~~~
 
-	If the olcPixelGameEngine.h is called from several sources it can cause
+	If the gameEngine.h is called from several sources it can cause
 	multiple definitions of objects. To prevent this, ONLY ONE of the pathways
 	to including this file must have OLC_PGE_APPLICATION defined before it. This prevents
 	the definitions being duplicated.
 
-	If all else fails, create a file called "olcPixelGameEngine.cpp" with the following
-	two lines. Then you can just #include "olcPixelGameEngine.h" as normal without worrying
+	If all else fails, create a file called "gameEngine.cpp" with the following
+	two lines. Then you can just #include "gameEngine.h" as normal without worrying
 	about defining things. Dont forget to include that cpp file as part of your build!
 
 	#define OLC_PGE_APPLICATION
-	#include "olcPixelGameEngine.h"
+	#include "gameEngine.h"
 
 */
 
@@ -882,7 +676,7 @@ namespace olc
 #undef OLC_PGE_APPLICATION
 
 // O------------------------------------------------------------------------------O
-// | olcPixelGameEngine INTERFACE IMPLEMENTATION (CORE)                           |
+// | gameEngine INTERFACE IMPLEMENTATION (CORE)                           |
 // | Note: The core implementation is platform independent                        |
 // O------------------------------------------------------------------------------O
 namespace olc
@@ -2711,7 +2505,7 @@ namespace olc
 
 
 // O------------------------------------------------------------------------------O
-// | olcPixelGameEngine PLATFORM SPECIFIC IMPLEMENTATIONS                         |
+// | gameEngine PLATFORM SPECIFIC IMPLEMENTATIONS                         |
 // O------------------------------------------------------------------------------O
 
 // O------------------------------------------------------------------------------O
@@ -3086,7 +2880,7 @@ namespace olc
 				vTopLeft.x, vTopLeft.y, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
 
 			// Create Keyboard Mapping
-			mapKeys[0x00] = Key::NONE;
+			mapKeys[0] = Key::NONE;
 			mapKeys[0x41] = Key::A; mapKeys[0x42] = Key::B; mapKeys[0x43] = Key::C; mapKeys[0x44] = Key::D; mapKeys[0x45] = Key::E;
 			mapKeys[0x46] = Key::F; mapKeys[0x47] = Key::G; mapKeys[0x48] = Key::H; mapKeys[0x49] = Key::I; mapKeys[0x4A] = Key::J;
 			mapKeys[0x4B] = Key::K; mapKeys[0x4C] = Key::L; mapKeys[0x4D] = Key::M; mapKeys[0x4E] = Key::N; mapKeys[0x4F] = Key::O;
@@ -3320,7 +3114,7 @@ namespace olc
 			}
 
 			// Create Keyboard Mapping
-			mapKeys[0x00] = Key::NONE;
+			mapKeys[0] = Key::NONE;
 			mapKeys[0x61] = Key::A; mapKeys[0x62] = Key::B; mapKeys[0x63] = Key::C; mapKeys[0x64] = Key::D; mapKeys[0x65] = Key::E;
 			mapKeys[0x66] = Key::F; mapKeys[0x67] = Key::G; mapKeys[0x68] = Key::H; mapKeys[0x69] = Key::I; mapKeys[0x6A] = Key::J;
 			mapKeys[0x6B] = Key::K; mapKeys[0x6C] = Key::L; mapKeys[0x6D] = Key::M; mapKeys[0x6E] = Key::N; mapKeys[0x6F] = Key::O;

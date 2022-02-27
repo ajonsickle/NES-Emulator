@@ -5,11 +5,8 @@
 mapper000::mapper000(uint8_t prgsections, uint8_t chrsections) : mapper(prgsections, chrsections) {
 
 }
-mapper000::~mapper000() {
-
-}
-
-bool mapper000::mapperRead(uint16_t address, uint32_t& mapped_address) {
+// & = ref 
+bool mapper000::mapperRead(uint16_t address, uint32_t& mapped_address, uint8_t &data) {
 	// rom data is held only in $8000-$FFFF
 	if (address >= 0x8000 && address <= 0xFFFF) {
 		// change mapping based on number of prg banks
@@ -21,7 +18,7 @@ bool mapper000::mapperRead(uint16_t address, uint32_t& mapped_address) {
 	return false;
 }
 
-bool mapper000::mapperWrite(uint16_t address, uint32_t& mapped_address) {
+bool mapper000::mapperWrite(uint16_t address, uint32_t& mapped_address, uint8_t data) {
 	// rom data is held only in $8000-$FFFF
 	if (address >= 0x8000 && address <= 0xFFFF) {
 		// change mapping based on number of prg banks
@@ -35,7 +32,7 @@ bool mapper000::mapperWrite(uint16_t address, uint32_t& mapped_address) {
 
 bool mapper000::ppuMapperRead(uint16_t address, uint32_t& mapped_address) {
 	// no mapping required for ppu
-	if (address >= 0x0000 && address <= 0x1FFF) {
+	if (address >= 0 && address <= 0x1FFF) {
 		mapped_address = address;
 		return true;
 	}
@@ -43,6 +40,15 @@ bool mapper000::ppuMapperRead(uint16_t address, uint32_t& mapped_address) {
 }
 
 bool mapper000::ppuMapperWrite(uint16_t address, uint32_t& mapped_address) {
-	// doesnt need to do anything
+	if (address >= 0 && address <= 0x1FFF) {
+		if (chrsections1 == 0) {
+			mapped_address = address;
+			return true;
+		}
+	}
 	return false;
+}
+
+void mapper000::reset() {
+
 }

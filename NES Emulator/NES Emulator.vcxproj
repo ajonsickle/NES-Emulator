@@ -102,6 +102,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -144,8 +145,9 @@
     <ClCompile Include="cpu.cpp" />
     <ClCompile Include="mapper.cpp" />
     <ClCompile Include="mapper000.cpp" />
+    <ClCompile Include="mapper001.cpp" />
     <ClCompile Include="ppu.cpp" />
-    <ClCompile Include="test.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bus.h" />
@@ -153,7 +155,8 @@
     <ClInclude Include="cpu.h" />
     <ClInclude Include="mapper.h" />
     <ClInclude Include="mapper000.h" />
-    <ClInclude Include="olcPixelGameEngine.h" />
+    <ClInclude Include="mapper001.h" />
+    <ClInclude Include="gameEngine.h" />
     <ClInclude Include="ppu.h" />
   </ItemGroup>
   <ItemGroup>

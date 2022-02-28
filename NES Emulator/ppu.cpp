@@ -745,7 +745,7 @@ void ppu::clock()
 			uint8_t lopixel = (bg_shifter_pattern_lo & selector) > 0;
 			uint8_t hipixel = (bg_shifter_pattern_hi & selector) > 0;
 			// combine these pixels together to form the full pixel
-			bg_pixel = (lopixel << 1) | hipixel;
+			bg_pixel = (hipixel << 1) | lopixel;
 			// 
 			uint8_t lopalette = (bg_shifter_attrib_lo & selector) > 0;
 			uint8_t hipalette = (bg_shifter_attrib_hi & selector) > 0;

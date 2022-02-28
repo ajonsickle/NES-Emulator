@@ -142,7 +142,7 @@ int main()
 	using recursive_directory_iterator = std::filesystem::recursive_directory_iterator;
 	// loop through rom folder and add to files vector 
 	std::filesystem::path path = std::filesystem::current_path() / "ROMs";
-	for (const auto& dirEntry : recursive_directory_iterator(path)) {
+	for (const auto& dirEntry : recursive_directory_iterator("C:\\ROMs")) {
 		
 		emu.addToFilesVec(dirEntry);
 	}
